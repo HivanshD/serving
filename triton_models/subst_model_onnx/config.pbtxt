@@ -1,0 +1,37 @@
+name: "subst_model_onnx"
+backend: "onnxruntime"
+max_batch_size: 16
+
+input [
+  {
+    name: "recipe_context"
+    data_type: TYPE_INT64
+    dims: [20]
+  },
+  {
+    name: "missing_ingredient"
+    data_type: TYPE_INT64
+    dims: [1]
+  }
+]
+
+output [
+  {
+    name: "scores"
+    data_type: TYPE_FP32
+    dims: [100]
+  }
+]
+
+instance_group [
+  {
+    count: 1
+    kind: KIND_GPU
+    gpus: [ 0 ]
+  }
+]
+
+dynamic_batching {
+  preferred_batch_size: [4, 6, 8]
+  max_queue_delay_microseconds: 100
+}

@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  triton_server:
+    build:
+      context: .
+      dockerfile: Dockerfile.triton
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+      - "8002:8002"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    shm_size: "16g"
+    restart: unless-stopped
+
+  triton_client:
+    build:
+      context: .
+      dockerfile: Dockerfile.triton_client
+    depends_on:
+      - triton_server
+    stdin_open: true
+    tty: true
+
+  jupyter:
+    image: jupyter/base-notebook:latest
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./workspace:/home/jovyan/work/
+      - ./triton_client:/home/jovyan/work/triton_client/
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+    restart: unless-stopped

@@ -1,0 +1,24 @@
+FROM nvcr.io/nvidia/tritonserver:24.01-py3
+
+# Install deps for Python backend model and ONNX export
+RUN pip install --no-cache-dir torch torchvision onnx
+
+# Copy model repository
+COPY triton_models/ /models/
+
+# Copy helper scripts to generate stub models
+COPY model_stub.py /tmp/
+COPY export_onnx.py /tmp/
+
+# Generate the PyTorch stub for the Python backend
+RUN python /tmp/model_stub.py \
+    && cp subst_model.pth /models/subst_model/1/subst_model.pth \
+    && cp /tmp/model_stub.py /models/subst_model/1/model_stub.py
+
+# Generate the ONNX model for the ONNX backend
+RUN cd /tmp && python export_onnx.py --input /models/subst_model/1/subst_model.pth --output /models/subst_model_onnx/1/model.onnx
+
+# Clean up
+RUN rm -f /tmp/model_stub.py /tmp/export_onnx.py subst_model.pth
+
+CMD ["tritonserver", "--model-repository=/models"]

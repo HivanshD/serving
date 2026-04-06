@@ -1,0 +1,27 @@
+name: "subst_model"
+backend: "python"
+max_batch_size: 16
+
+input [
+  {
+    name: "INPUT_JSON"
+    data_type: TYPE_STRING
+    dims: [1]
+  }
+]
+
+output [
+  {
+    name: "OUTPUT_JSON"
+    data_type: TYPE_STRING
+    dims: [1]
+  }
+]
+
+instance_group [
+  {
+    count: 1
+    kind: KIND_GPU
+    gpus: [ 0 ]
+  }
+]

@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+  fastapi_server:
+    build:
+      context: .
+      dockerfile: fastapi_onnx/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - ONNX_MODEL_PATH=subst_model.onnx
+    restart: unless-stopped
+
+  jupyter:
+    image: jupyter/base-notebook:latest
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./workspace:/home/jovyan/work/
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+    restart: unless-stopped

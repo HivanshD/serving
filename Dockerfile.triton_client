@@ -1,0 +1,12 @@
+FROM nvcr.io/nvidia/tritonserver:24.01-py3-sdk
+
+# perf_analyzer is included in the SDK image
+# Also install Python client for scripted tests
+RUN pip install --no-cache-dir tritonclient[all] numpy
+
+WORKDIR /workspace
+
+# Copy test input files
+COPY triton_client/ /workspace/
+
+CMD ["bash"]
