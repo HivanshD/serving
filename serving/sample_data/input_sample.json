@@ -1,0 +1,25 @@
+{
+  "recipe_id": "1204837",
+  "recipe_title": "Classic Cheesecake",
+  "ingredients": [
+    {"raw": "2 cups cream cheese", "normalized": "cream cheese"},
+    {"raw": "1 cup sour cream", "normalized": "sour cream"},
+    {"raw": "3/4 cup sugar", "normalized": "sugar"},
+    {"raw": "3 large eggs", "normalized": "egg"},
+    {"raw": "1 tsp vanilla extract", "normalized": "vanilla extract"},
+    {"raw": "1 1/2 cups graham cracker crumbs", "normalized": "graham cracker crumbs"},
+    {"raw": "1/4 cup melted butter", "normalized": "butter"}
+  ],
+  "instructions": [
+    "Preheat oven to 325F.",
+    "Mix graham cracker crumbs with melted butter and press into pan.",
+    "Beat cream cheese and sugar until smooth.",
+    "Add eggs one at a time, then sour cream and vanilla.",
+    "Pour over crust and bake 55 minutes."
+  ],
+  "missing_ingredient": {
+    "raw": "1 cup sour cream",
+    "normalized": "sour cream"
+  },
+  "top_k": 3
+}

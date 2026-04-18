@@ -1,0 +1,42 @@
+# serving/docker/Dockerfile.fastapi_onnx
+# PRODUCTION serving container.
+# Pattern based on:
+#   - eval-online-chi/docker/Dockerfile.fastapi_pt (lab's FastAPI container)
+#   - serve-system-chi/fastapi_onnx (lab's ONNX serving)
+#
+# 4 uvicorn workers per pod handle bursty Poisson load. With HPA 1-4
+# replicas, the pod set has 16 concurrent request slots before queueing.
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY fastapi_onnx/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 'requests' is also needed by check_rollback/check_promote scripts that
+# ship inside this image (CronJobs reuse the serving image)
+RUN pip install --no-cache-dir requests
+
+COPY fastapi_onnx/serve_onnx.py /app/
+COPY scripts/reload_model.py /app/scripts/
+COPY scripts/check_rollback.py /app/scripts/
+COPY scripts/check_promote.py /app/scripts/
+
+RUN useradd --create-home --uid 1000 appuser && chown -R appuser /app
+USER appuser
+
+ENV BACKEND=onnx \
+    ONNX_MODEL_PATH=/app/model.onnx \
+    VOCAB_PATH=/app/vocab.json \
+    ORT_THREADS=2 \
+    UVICORN_WORKERS=4 \
+    PYTHONUNBUFFERED=1
+
+EXPOSE 8000
+
+CMD ["sh", "-c", "python /app/scripts/reload_model.py && exec uvicorn serve_onnx:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS:-4}"]

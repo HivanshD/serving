@@ -1,0 +1,11 @@
+{
+  "request_id": "req_8a3f2c1d",
+  "recipe_id": "1204837",
+  "missing_ingredient": "sour cream",
+  "substitutions": [
+    {"ingredient": "greek yogurt", "rank": 1, "embedding_score": 0.9134},
+    {"ingredient": "plain yogurt", "rank": 2, "embedding_score": 0.8507},
+    {"ingredient": "buttermilk",   "rank": 3, "embedding_score": 0.7223}
+  ],
+  "serving_version": "onnx-quantized"
+}

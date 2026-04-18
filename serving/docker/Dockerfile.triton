@@ -1,0 +1,37 @@
+# serving/docker/Dockerfile.triton
+# Triton Inference Server.
+# Pattern based on serve-system-chi/docker/Dockerfile.triton from the
+# System Optimizations lab.
+#
+# CRITICAL: Triton 24.01 requires ONNX opset 14 — don't change the base
+# image tag without re-verifying opset compatibility. (We learned this
+# the hard way in initial implementation when opset 20 silently broke.)
+
+FROM nvcr.io/nvidia/tritonserver:24.01-py3
+
+WORKDIR /workspace
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3-pip curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python backend dependencies (torch for model.py, boto3 for model download)
+RUN pip install --no-cache-dir torch numpy boto3
+
+# Model repository layout (Triton expects /models/<model_name>/<version>/...)
+COPY models/ /models/
+
+# model_stub.py is copied alongside the Python backend so it can import it
+COPY fastapi_pt/model_stub.py /models/subst_model/1/model_stub.py
+
+# Startup helper downloads model files before tritonserver scans /models
+COPY scripts/reload_model.py /workspace/reload_model.py
+COPY scripts/triton_startup.sh /workspace/triton_startup.sh
+RUN chmod +x /workspace/triton_startup.sh
+
+ENV MODEL_REPO=/models \
+    PYTHONUNBUFFERED=1
+
+EXPOSE 8000 8001 8002
+
+CMD ["/workspace/triton_startup.sh"]

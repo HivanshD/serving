@@ -1,0 +1,18 @@
+# fastapi_pt/requirements.txt
+# Based on the Online Evaluation lab (eval-online-chi) requirements pattern.
+# The lab uses unpinned package names — pip resolves compatible versions
+# at build time. This avoids the version-conflict issues we hit in the
+# initial implementation (ONNX opset mismatch, INC API break, etc.).
+#
+# The lab explicitly lists: fastapi, uvicorn, torch, pillow, numpy,
+# prometheus-fastapi-instrumentator, prometheus-client, alibi-detect.
+# We keep the same set; alibi-detect is optional for drift detection.
+
+fastapi
+uvicorn[standard]
+pydantic
+torch
+numpy
+prometheus-client
+prometheus-fastapi-instrumentator
+boto3

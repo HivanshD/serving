@@ -1,0 +1,52 @@
+# serving/docker/docker-compose-fastapi.yaml
+#
+# Use for:
+#   1) Local development — bring up both PyTorch and ONNX endpoints
+#      side by side so you can compare them.
+#   2) Chameleon benchmarking — same environment as initial implementation.
+#
+# NOT for production K8S deployment — use infra/k8s/ manifests for that.
+#
+# Usage:
+#   docker compose -f docker-compose-fastapi.yaml build
+#   docker compose -f docker-compose-fastapi.yaml up -d
+#   curl http://localhost:8000/health   # PyTorch
+#   curl http://localhost:8001/health   # ONNX
+
+version: "3.8"
+
+services:
+
+  fastapi_pt:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.fastapi_pt
+    image: subst-serving-pt:latest
+    container_name: subst-fastapi-pt
+    ports:
+      - "8000:8000"
+    environment:
+      # Object storage — leave blank locally; reload_model.py falls back
+      # to stub weights when OS_ENDPOINT is unset.
+      - OS_ENDPOINT=${OS_ENDPOINT:-}
+      - OS_ACCESS_KEY=${OS_ACCESS_KEY:-}
+      - OS_SECRET_KEY=${OS_SECRET_KEY:-}
+      - LOG_REQUESTS=${LOG_REQUESTS:-false}
+      - SERVING_VERSION=pytorch-baseline
+    restart: unless-stopped
+
+  fastapi_onnx:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.fastapi_onnx
+    image: subst-serving-onnx:latest
+    container_name: subst-fastapi-onnx
+    ports:
+      - "8001:8000"
+    environment:
+      - OS_ENDPOINT=${OS_ENDPOINT:-}
+      - OS_ACCESS_KEY=${OS_ACCESS_KEY:-}
+      - OS_SECRET_KEY=${OS_SECRET_KEY:-}
+      - LOG_REQUESTS=${LOG_REQUESTS:-false}
+      - SERVING_VERSION=onnx-quantized
+    restart: unless-stopped

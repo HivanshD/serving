@@ -1,0 +1,42 @@
+# Model weights — these live in object storage, never in Git
+*.pth
+*.onnx
+*.bin
+*.safetensors
+
+# Local model caches (downloaded at startup)
+/app/model.pth
+/app/model.onnx
+/app/vocab.json
+
+# Vocabulary artifacts — live in object storage
+vocab.json
+
+# Secrets — NEVER commit
+.env
+.env.*
+*.secret
+secrets/
+k8s/secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+env/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Benchmark outputs
+benchmark_results_*.json
+perf_analyzer_*.csv
+
+# Docker build artifacts
+*.tar

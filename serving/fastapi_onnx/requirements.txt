@@ -1,0 +1,13 @@
+# fastapi_onnx/requirements.txt
+# Based on Online Evaluation lab pattern (unpinned) + ONNX Runtime.
+# The System Optimizations lab uses onnxruntime directly via pip.
+
+fastapi
+uvicorn[standard]
+pydantic
+onnxruntime
+onnx
+numpy
+prometheus-client
+prometheus-fastapi-instrumentator
+boto3

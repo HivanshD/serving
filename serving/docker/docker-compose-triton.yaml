@@ -1,0 +1,60 @@
+# serving/docker/docker-compose-triton.yaml
+#
+# For Triton benchmarking on Chameleon GPU nodes.
+# Triton is NOT the production default — this is kept as the "high-throughput
+# GPU" row in the serving options table.
+#
+# Usage on a Chameleon GPU node (e.g. gpu_p100 at CHI@TACC):
+#   export OS_ENDPOINT=http://<MINIO_IP>:9000
+#   export OS_ACCESS_KEY=...
+#   export OS_SECRET_KEY=...
+#   docker compose -f docker-compose-triton.yaml build
+#   docker compose -f docker-compose-triton.yaml up -d
+#
+#   # Then from the client container:
+#   docker exec -it subst-triton-client bash
+#   perf_analyzer -u subst-triton-server:8000 \
+#       -m subst_model_onnx --input-data /workspace/input_triton.json \
+#       -b 1 --concurrency-range 1:16:4
+
+version: "3.8"
+
+services:
+
+  triton_server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.triton
+    image: subst-triton:latest
+    container_name: subst-triton-server
+    ports:
+      - "8000:8000"   # HTTP
+      - "8001:8001"   # gRPC
+      - "8002:8002"   # Metrics (Prometheus)
+    environment:
+      - OS_ENDPOINT=${OS_ENDPOINT:-}
+      - OS_ACCESS_KEY=${OS_ACCESS_KEY:-}
+      - OS_SECRET_KEY=${OS_SECRET_KEY:-}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    shm_size: "1g"
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    restart: unless-stopped
+
+  triton_client:
+    image: nvcr.io/nvidia/tritonserver:24.01-py3-sdk
+    container_name: subst-triton-client
+    depends_on:
+      - triton_server
+    volumes:
+      - ../sample_data:/workspace
+    tty: true
+    stdin_open: true
+    command: ["sleep", "infinity"]
