@@ -1,0 +1,5 @@
+FROM python:3.11-slim
+WORKDIR /app
+RUN pip install --no-cache-dir boto3 prometheus-client
+COPY batch_pipeline.py drift_monitor.py .
+CMD ["python", "batch_pipeline.py"]

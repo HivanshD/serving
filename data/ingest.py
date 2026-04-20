@@ -34,7 +34,10 @@ def ensure_bucket(s3):
 
     folders = [
         'data/raw/recipe1msubs/',
+<<<<<<< HEAD
         'data/raw/recipe1m/',
+=======
+>>>>>>> 9b402226e9dbf4f6fed1a25f12fcbbb96e70f717
         'data/processed/',
         'data/triggers/',
         'data/production_holdout/',
@@ -174,6 +177,7 @@ def upload_split(s3, data, split_name):
 
 def main():
     parser = argparse.ArgumentParser()
+<<<<<<< HEAD
     parser.add_argument('--data-dir', default='./recipe1msubs',
                         help='Dir with Recipe1MSubs train/val/test.json')
     parser.add_argument('--recipe1m-dir', default='./recipe1m',
@@ -183,6 +187,12 @@ def main():
     data_dir = Path(args.data_dir)
     r1m_dir = Path(args.recipe1m_dir)
 
+=======
+    parser.add_argument('--data-dir', default='./recipe1msubs')
+    args = parser.parse_args()
+
+    data_dir = Path(args.data_dir)
+>>>>>>> 9b402226e9dbf4f6fed1a25f12fcbbb96e70f717
     if not data_dir.exists():
         print(f"ERROR: {data_dir} not found. Download Recipe1MSubs first.")
         sys.exit(1)
@@ -190,6 +200,7 @@ def main():
     s3 = get_s3()
     ensure_bucket(s3)
 
+<<<<<<< HEAD
     # ── Upload Recipe1M context (layer1.json) ───────────────────
     layer1_path = r1m_dir / 'layer1.json'
     if layer1_path.exists():
@@ -204,6 +215,8 @@ def main():
               f"Training will need Recipe1M context separately.")
 
     # ── QC1: Validate and upload Recipe1MSubs splits ────────────
+=======
+>>>>>>> 9b402226e9dbf4f6fed1a25f12fcbbb96e70f717
     all_reports = []
     all_passed = True
 
@@ -220,7 +233,10 @@ def main():
         else:
             all_passed = False
 
+<<<<<<< HEAD
     # ── Production holdout (NEVER used for training) ────────────
+=======
+>>>>>>> 9b402226e9dbf4f6fed1a25f12fcbbb96e70f717
     if all_passed:
         test_data = json.loads((data_dir / 'test.json').read_text())
         holdout = test_data[:len(test_data) // 2]
@@ -229,7 +245,10 @@ def main():
                       Body=json.dumps(holdout))
         print(f"\n[ingest] Holdout: {len(holdout)} records (never train on this)")
 
+<<<<<<< HEAD
     # ── Save quality report ─────────────────────────────────────
+=======
+>>>>>>> 9b402226e9dbf4f6fed1a25f12fcbbb96e70f717
     ts = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
     report = {
         'pipeline': 'ingest', 'checkpoint': 'QC1',

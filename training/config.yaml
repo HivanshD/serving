@@ -1,0 +1,10 @@
+embed_dim: 128
+hidden_dim: 256
+context_len: 20
+epochs: 20
+batch_size: 64
+lr: 0.001
+margin: 0.5
+gat_pretrain_epochs: 30
+quality_gate_mrr: 0.15
+mlflow_uri: 'http://localhost:5000'

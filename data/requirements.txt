@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+pydantic
+boto3
+requests
+prometheus-client
+prometheus-fastapi-instrumentator
