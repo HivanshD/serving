@@ -1,0 +1,43 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: training-trigger
+  namespace: forkwise-data
+spec:
+  schedule: "*/15 * * * *"
+  suspend: false
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: training
+              image: ghcr.io/karunaav/forkwise-train:latest
+              imagePullPolicy: Always
+              command: ["python", "training/watch_trigger.py"]
+              envFrom:
+                - configMapRef:
+                    name: forkwise-data-config
+              env:
+                - name: OS_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: s3-credentials
+                      key: access-key
+                - name: OS_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: s3-credentials
+                      key: secret-key
+                - name: MLFLOW_TRACKING_URI
+                  value: "http://10.140.82.89:5000"
+              resources:
+                requests:
+                  cpu: 500m
+                  memory: 4Gi
+                limits:
+                  cpu: 4000m
+                  memory: 16Gi
