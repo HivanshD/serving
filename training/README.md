@@ -73,5 +73,15 @@ WRITES: models-proj01/checkpoints/subst_model_v{run_id}.pth
 WRITES: models-proj01/production/subst_model_current.pth
 WRITES: MLflow model registry
 ```
-
+| Order | Run | embed_dim | lr | epochs | batch_size | margin | Time |
+|---|---|---|---|---|---|---|---|
+| 1 | baseline | 64 | 0.01 | 5 | 32 | 0.3 | ~1 min |
+| 2 | v1 | 128 | 0.01 | 20 | 128 | 0.3 | ~3 min |
+| 3 | v2 | 256 | 0.001 | 30 | 64 | 0.5 | ~7 min |
+| 4 | v3 | 512 | 0.0005 | 40 | 64 | 0.7 | ~12 min |
+| 5 | final | 4096 | 0.0001 | 50 | 32 | 1.0 | ~90 min |
+| 6 | final-v2 | 2048 | 0.0003 | 50 | 32 | 1.0 | ~45 min |
+| 7 | final-best | 4096 | 0.00003 | 50 | 8 | 2.0 | ~51 min |
+| 8 | final-best-v2 | 4096 | 0.00001 | 100 | 8 | 2.0 | ~2 hrs |
+| 9 | gismo-final | 4096 | 0.00001 | 100 | 8 | 2.0 | ~2 hrs |
 
