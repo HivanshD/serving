@@ -6,6 +6,8 @@ metadata:
 data:
   OS_ENDPOINT: https://chi.tacc.chameleoncloud.org:7480
   BUCKET: data-proj01
+  MODEL_PREFIX: models
+  VAL_DATASET_KEY: data/raw/recipe1msubs/val.json
   SERVING_URL: http://substitution-serving.forkwise-serving.svc.cluster.local:8000/predict
   REQUESTS_PER_SEC: "1"
   MIN_NEW_SAMPLES: "50"

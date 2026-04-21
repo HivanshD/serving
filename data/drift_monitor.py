@@ -42,6 +42,17 @@ DRIFT_ALERT = Gauge('subst_drift_alert', '1=drift, 0=ok')
 
 
 def load_training_vocab(s3):
+    try:
+        obj = s3.get_object(Bucket=BUCKET,
+                            Key='models/production/vocab.json')
+        vocab_json = json.loads(obj['Body'].read())
+        vocab = {str(k).lower().strip() for k in vocab_json.keys()}
+        vocab.discard('')
+        print("[drift] Loaded production vocab from models/production/vocab.json")
+        return vocab
+    except Exception:
+        pass
+
     obj = s3.get_object(Bucket=BUCKET,
                         Key='data/raw/recipe1msubs/train.json')
     data = json.loads(obj['Body'].read())
@@ -53,6 +64,7 @@ def load_training_vocab(s3):
         for ing in rec.get('ingredients', []):
             if isinstance(ing, str): vocab.add(ing.lower().strip())
     vocab.discard('')
+    print("[drift] Loaded fallback vocab from data/raw/recipe1msubs/train.json")
     return vocab
 
 

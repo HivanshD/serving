@@ -7,4 +7,5 @@ lr: 0.001
 margin: 0.5
 gat_pretrain_epochs: 30
 quality_gate_mrr: 0.15
-mlflow_uri: 'http://localhost:5000'
+seed: 42
+mlflow_uri: ''

@@ -1,0 +1,51 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: check-rollback
+  namespace: forkwise-serving
+spec:
+  schedule: "*/5 * * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: check-rollback
+              image: substitution-serving:local
+              imagePullPolicy: IfNotPresent
+              command: ["python", "/app/scripts/check_rollback.py"]
+              env:
+                - name: OS_ENDPOINT
+                  value: https://chi.tacc.chameleoncloud.org:7480
+                - name: OS_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: s3-credentials
+                      key: access-key
+                - name: OS_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: s3-credentials
+                      key: secret-key
+                - name: MODEL_BUCKET
+                  value: data-proj01
+                - name: REQUEST_LOG_BUCKET
+                  value: data-proj01
+                - name: MODEL_PREFIX
+                  value: models
+                - name: SERVING_HEALTH_URL
+                  value: http://substitution-serving.forkwise-serving.svc.cluster.local:8000/health
+                - name: LATENCY_P95_THRESHOLD_S
+                  value: "0.5"
+                - name: ERROR_RATE_THRESHOLD
+                  value: "0.05"
+                - name: LATENCY_WINDOW_MIN
+                  value: "10"
+                - name: ERROR_WINDOW_MIN
+                  value: "5"
+                - name: MIN_REQUESTS
+                  value: "10"

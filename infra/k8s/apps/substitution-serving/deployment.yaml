@@ -22,8 +22,38 @@ spec:
           ports:
             - containerPort: 8000
           env:
+            - name: OS_ENDPOINT
+              value: https://chi.tacc.chameleoncloud.org:7480
+            - name: OS_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: s3-credentials
+                  key: access-key
+            - name: OS_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: s3-credentials
+                  key: secret-key
             - name: ONNX_MODEL_PATH
-              value: subst_model.onnx
+              value: /app/model.onnx
+            - name: VOCAB_PATH
+              value: /app/vocab.json
+            - name: MODEL_METADATA_PATH
+              value: /app/model_metadata.json
+            - name: MODEL_BUCKET
+              value: data-proj01
+            - name: ONNX_MODEL_KEY
+              value: models/production/subst_model_current.onnx
+            - name: VOCAB_KEY
+              value: models/production/vocab.json
+            - name: MODEL_METADATA_KEY
+              value: models/production/model_metadata.json
+            - name: REQUEST_LOG_BUCKET
+              value: data-proj01
+            - name: LOG_REQUESTS
+              value: "true"
+            - name: MODEL_REFRESH_INTERVAL_SEC
+              value: "60"
           readinessProbe:
             httpGet:
               path: /health

@@ -1,0 +1,5 @@
+[
+  {"recipe_id":"1","original":"sour cream","replacement":"greek yogurt","ingredients":["beef broth","butter","all-purpose flour","egg noodles"],"cuisine":"american"},
+  {"recipe_id":"2","original":"butter","replacement":"oil","ingredients":["garlic","onion","tomato"],"cuisine":"italian"},
+  {"recipe_id":"3","original":"milk","replacement":"water","ingredients":["flour","sugar","vanilla"],"cuisine":"bakery"}
+]

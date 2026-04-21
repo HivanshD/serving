@@ -9,3 +9,4 @@ resources:
   - deployment-generator.yaml
   - cronjob-batch.yaml
   - cronjob-drift.yaml
+  - cronjob-training.yaml

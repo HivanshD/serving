@@ -1,94 +1,146 @@
 """
-watch_trigger.py - watches data-proj01 bucket for new data triggers
-and automatically kicks off retraining when new data is ingested.
+watch_trigger.py - watches retraining trigger objects in data-proj01 and
+launches one training run per new trigger.
 
 Run as K8S CronJob every 15 minutes:
   python watch_trigger.py
 """
-import os, json, subprocess, time, urllib.request
+
+import json
+import os
+import subprocess
+import sys
 from datetime import datetime
+from pathlib import Path
 
-BUCKET_URL = "https://chi.tacc.chameleoncloud.org:7480/swift/v1/AUTH_d3c6e101843a4ba79e665ebf59b521a2/data-proj01"
 TRAIN_SCRIPT = "/workspace/training/train.py"
-CONFIG       = "/workspace/training/config.yaml"
-DATASET      = "/workspace/data/processed/train.json"
-MLFLOW_URI   = os.getenv("MLFLOW_TRACKING_URI", "http://10.140.82.89:5000")
-LAST_SEEN_FILE = "/tmp/last_trigger_etag.txt"
+CONFIG = "/workspace/training/config.yaml"
+BUCKET = os.getenv("BUCKET", "data-proj01")
+TRIGGER_PREFIX = os.getenv("TRIGGER_PREFIX", "data/triggers/")
+PROCESSED_PREFIX = os.getenv("PROCESSED_TRIGGER_PREFIX", "data/triggers/processed/")
+MODEL_PREFIX = os.getenv("MODEL_PREFIX", "models")
+VAL_KEY = os.getenv("VAL_DATASET_KEY", "data/raw/recipe1msubs/val.json")
+LOCAL_WORKDIR = Path(os.getenv("LOCAL_TRAINING_DIR", "/tmp/forkwise_training"))
+MLFLOW_URI = os.getenv("MLFLOW_TRACKING_URI", "")
+PYTHON_BIN = os.getenv("PYTHON_BIN", sys.executable)
 
-def get_token():
-    token = os.getenv("OS_TOKEN", "")
-    if not token:
-        raise ValueError("OS_TOKEN not set")
-    return token
 
-def get_latest_train_etag(token):
-    url = f"{BUCKET_URL}/data/raw/recipe1msubs/train.json"
-    req = urllib.request.Request(url, method="HEAD", headers={"X-Auth-Token": token})
-    try:
-        with urllib.request.urlopen(req) as r:
-            return r.headers.get("ETag", "")
-    except Exception:
-        return ""
+def get_s3():
+    import boto3
 
-def load_last_etag():
-    try:
-        return open(LAST_SEEN_FILE).read().strip()
-    except Exception:
-        return ""
+    return boto3.client(
+        "s3",
+        endpoint_url=os.getenv("OS_ENDPOINT"),
+        aws_access_key_id=os.getenv("OS_ACCESS_KEY"),
+        aws_secret_access_key=os.getenv("OS_SECRET_KEY"),
+    )
 
-def save_etag(etag):
-    open(LAST_SEEN_FILE, "w").write(etag)
 
-def download_latest_data(token):
-    base = BUCKET_URL
-    os.makedirs("/workspace/data/processed", exist_ok=True)
-    os.makedirs("/workspace/data/production_holdout", exist_ok=True)
-    for src, dst in [
-        ("data/raw/recipe1msubs/train.json", "/workspace/data/processed/train.json"),
-        ("data/raw/recipe1msubs/val.json",   "/workspace/data/processed/val.json"),
-        ("data/production_holdout/holdout.json", "/workspace/data/production_holdout/holdout.json"),
-    ]:
-        req = urllib.request.Request(f"{base}/{src}", headers={"X-Auth-Token": token})
-        with urllib.request.urlopen(req) as r:
-            open(dst, "wb").write(r.read())
-        print(f"Downloaded {src}")
+def parse_storage_path(path):
+    if path.startswith("s3://"):
+        bucket_and_key = path[5:]
+        bucket, key = bucket_and_key.split("/", 1)
+        return bucket, key
+    if "/" not in path:
+        raise ValueError(f"Unsupported dataset_path: {path}")
+    bucket, key = path.split("/", 1)
+    return bucket, key
 
-def run_training():
+
+def list_pending_triggers(s3):
+    paginator = s3.get_paginator("list_objects_v2")
+    pending = []
+    for page in paginator.paginate(Bucket=BUCKET, Prefix=TRIGGER_PREFIX):
+        for obj in page.get("Contents", []):
+            key = obj["Key"]
+            if key.endswith(".keep") or "/processed/" in key:
+                continue
+            if not Path(key).name.startswith("retrain_"):
+                continue
+            marker_key = f"{PROCESSED_PREFIX}{Path(key).name}.done"
+            try:
+                s3.head_object(Bucket=BUCKET, Key=marker_key)
+                continue
+            except Exception:
+                pending.append((key, obj["LastModified"]))
+    pending.sort(key=lambda item: item[1])
+    return [key for key, _ in pending]
+
+
+def download_file(s3, bucket, key, destination):
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    s3.download_file(Bucket=bucket, Key=key, Filename=str(destination))
+    print(f"Downloaded {bucket}/{key} -> {destination}")
+
+
+def load_trigger(s3, key):
+    obj = s3.get_object(Bucket=BUCKET, Key=key)
+    return json.loads(obj["Body"].read())
+
+
+def run_training(train_path, val_path):
     cmd = [
-        "python", TRAIN_SCRIPT,
-        "--config", CONFIG,
-        "--dataset", DATASET,
-        "--embed_dim", "4096",
-        "--lr", "0.00005",
-        "--epochs", "50",
-        "--batch_size", "16",
-        "--margin", "1.5",
-        "--run_name", f"auto-retrain-{datetime.now().strftime('%Y%m%d-%H%M')}",
-        "--mlflow_tracking_uri", MLFLOW_URI,
+        PYTHON_BIN,
+        TRAIN_SCRIPT,
+        "--config",
+        CONFIG,
+        "--dataset",
+        str(train_path),
+        "--val_dataset",
+        str(val_path),
+        "--run_name",
+        f"auto-retrain-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}",
+        "--storage_bucket",
+        BUCKET,
+        "--model_prefix",
+        MODEL_PREFIX,
     ]
-    print(f"[{datetime.now()}] Starting retraining: {' '.join(cmd)}")
+    if MLFLOW_URI:
+        cmd.extend(["--mlflow_tracking_uri", MLFLOW_URI])
+
+    print(f"[{datetime.utcnow()}] Starting retraining: {' '.join(cmd)}")
     result = subprocess.run(cmd)
-    print(f"[{datetime.now()}] Training finished with exit code {result.returncode}")
+    print(f"[{datetime.utcnow()}] Training finished with exit code {result.returncode}")
     return result.returncode
 
+
+def mark_processed(s3, trigger_key, trigger_payload, status):
+    marker_key = f"{PROCESSED_PREFIX}{Path(trigger_key).name}.done"
+    marker = {
+        "trigger_key": trigger_key,
+        "status": status,
+        "processed_at": datetime.utcnow().isoformat() + "Z",
+        "dataset_path": trigger_payload.get("dataset_path", ""),
+    }
+    s3.put_object(Bucket=BUCKET, Key=marker_key, Body=json.dumps(marker))
+    print(f"Wrote processed marker {marker_key}")
+
+
 def main():
-    print(f"[{datetime.now()}] ForkWise watch_trigger started")
-    token        = get_token()
-    current_etag = get_latest_train_etag(token)
-    last_etag    = load_last_etag()
-    print(f"Current ETag: {current_etag}")
-    print(f"Last seen:    {last_etag}")
-    if current_etag and current_etag != last_etag:
-        print(f"[{datetime.now()}] New data detected — triggering retraining...")
-        download_latest_data(token)
-        rc = run_training()
-        if rc == 0:
-            save_etag(current_etag)
-            print(f"[{datetime.now()}] Retraining complete. ETag saved.")
-        else:
-            print(f"[{datetime.now()}] Retraining failed with exit code {rc}")
+    print(f"[{datetime.utcnow()}] ForkWise watch_trigger started")
+    s3 = get_s3()
+    pending = list_pending_triggers(s3)
+    if not pending:
+        print(f"[{datetime.utcnow()}] No new retraining triggers. Skipping.")
+        return
+
+    trigger_key = pending[0]
+    trigger = load_trigger(s3, trigger_key)
+    dataset_bucket, dataset_key = parse_storage_path(trigger["dataset_path"])
+
+    LOCAL_WORKDIR.mkdir(parents=True, exist_ok=True)
+    train_path = LOCAL_WORKDIR / Path(dataset_key).name
+    val_path = LOCAL_WORKDIR / "val.json"
+    download_file(s3, dataset_bucket, dataset_key, train_path)
+    download_file(s3, BUCKET, VAL_KEY, val_path)
+
+    rc = run_training(train_path, val_path)
+    if rc == 0:
+        mark_processed(s3, trigger_key, trigger, "completed")
     else:
-        print(f"[{datetime.now()}] No new data. Skipping retraining.")
+        print(f"[{datetime.utcnow()}] Retraining failed with exit code {rc}")
+        raise SystemExit(rc)
+
 
 if __name__ == "__main__":
     main()

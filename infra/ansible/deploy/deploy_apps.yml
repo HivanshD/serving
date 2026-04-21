@@ -80,6 +80,16 @@
       register: serving_image_set
       changed_when: true
 
+    - name: Set rollback CronJob image after apply
+      ansible.builtin.command: >-
+        kubectl set image cronjob/check-rollback
+        check-rollback={{ serving_image }}
+        -n forkwise-serving
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      register: rollback_image_set
+      changed_when: true
+
     - name: Wait for substitution-serving rollout
       ansible.builtin.command: kubectl rollout status deployment/substitution-serving -n forkwise-serving --timeout=180s
       environment:

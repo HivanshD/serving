@@ -50,6 +50,11 @@ def main():
                             "models/production/vocab.json"),
                  os.getenv("VOCAB_PATH", "/app/vocab.json"),
                  "Vocabulary")
+        download(s3, bucket,
+                 os.getenv("MODEL_METADATA_KEY",
+                            "models/production/model_metadata.json"),
+                 os.getenv("MODEL_METADATA_PATH", "/app/model_metadata.json"),
+                 "Model metadata")
     sys.exit(0)
 
 if __name__ == "__main__":

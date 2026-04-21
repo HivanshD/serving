@@ -15,8 +15,8 @@ spec:
           restartPolicy: Never
           containers:
             - name: training
-              image: ghcr.io/karunaav/forkwise-train:latest
-              imagePullPolicy: Always
+              image: forkwise-train:local
+              imagePullPolicy: IfNotPresent
               command: ["python", "training/watch_trigger.py"]
               envFrom:
                 - configMapRef:
@@ -32,8 +32,6 @@ spec:
                     secretKeyRef:
                       name: s3-credentials
                       key: secret-key
-                - name: MLFLOW_TRACKING_URI
-                  value: "http://10.140.82.89:5000"
               resources:
                 requests:
                   cpu: 500m
