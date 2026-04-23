@@ -31,12 +31,34 @@ The default topology provisions:
 
 ```bash
 cd tf/kvm
+export PATH=/work/.local/bin:$PATH
+unset $(set | grep -o "^OS_[A-Za-z0-9_]*")
+export OS_CLIENT_CONFIG_FILE=$PWD/clouds.yaml
+export OS_CLOUD=openstack
+
 cp terraform.tfvars.example terraform.tfvars
 terraform init
 terraform validate
 terraform plan
 terraform apply -auto-approve
 ```
+
+If you are provisioning from the Chameleon Jupyter control host, keep
+`clouds.yaml` in this directory and prefer the explicit `OS_CLIENT_CONFIG_FILE`
+and `OS_CLOUD` exports above so Terraform and `openstack` CLI use the same
+credential source.
+
+If normal scheduling is full, create a short Chameleon lease for `3 x
+m1.large`, copy the reservation-backed `flavor_id` into `terraform.tfvars`,
+then retry with:
+
+```bash
+terraform apply -auto-approve -parallelism=1
+```
+
+If you create multiple leases with the same name while iterating, use the
+lease UUID instead of the human-readable name when checking lease status with
+the `openstack` CLI.
 
 ## Secrets Hygiene
 

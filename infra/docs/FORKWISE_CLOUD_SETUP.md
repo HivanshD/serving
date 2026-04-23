@@ -4,7 +4,14 @@ This is the canonical step-by-step runbook for bringing up the current
 ForkWise stack on a cloud Kubernetes environment, with the data-plane images
 pulled from GHCR instead of built ad hoc on the cluster.
 
-## What this deploys
+The current manifests can bootstrap the cluster and the base apps, and the repo
+now also includes an initial rollout implementation for the shared platform and
+`staging` / `canary` / `production` serving environments.
+
+For the rubric-to-repo mapping, read `infra/docs/DEVOPS_RUBRIC_MAP.md`.
+For reviewer and professor access via SSH tunnels, read `infra/docs/EXTERNAL_ACCESS.md`.
+
+## What the current bootstrap path deploys
 
 1. Chameleon VMs via Terraform
 2. k3s via Ansible
@@ -39,6 +46,7 @@ You need:
 3. OpenStack object-store credentials for `data-proj01`
 4. A registry image for `substitution-serving`, or a local build/push plan for it
 5. A registry image for `forkwise-train`, or a local build/push plan for it
+6. A registry image for `infra/automation`, or a local build/push plan for it
 
 If the GHCR packages are private, log in before you do anything else:
 
@@ -52,6 +60,11 @@ echo "$GHCR_TOKEN" | docker login ghcr.io -u <github-username> --password-stdin
 
 ```bash
 cd infra/tf/kvm
+export PATH=/work/.local/bin:$PATH
+unset $(set | grep -o '^OS_[A-Za-z0-9_]*')
+export OS_CLIENT_CONFIG_FILE=$PWD/clouds.yaml
+export OS_CLOUD=openstack
+
 cp terraform.tfvars.example terraform.tfvars
 
 # Fill in terraform.tfvars and keep it out of Git.
@@ -61,13 +74,41 @@ terraform plan
 terraform apply -auto-approve
 ```
 
+If you are provisioning from the Chameleon Jupyter control host, keep
+`clouds.yaml` in `infra/tf/kvm/` and prefer the explicit `OS_CLIENT_CONFIG_FILE`
+and `OS_CLOUD` exports above so Terraform and the `openstack` CLI read the same
+credentials.
+
+If normal scheduling is full, create a short lease for `3 x m1.large`, copy the
+reservation-backed `flavor_id` into `terraform.tfvars`, and retry with:
+
+```bash
+terraform apply -auto-approve -parallelism=1
+```
+
+If you create multiple leases with the same name while iterating, use the lease
+UUID rather than the human-readable name when checking status via `openstack
+reservation lease show ...`.
+
 Record the floating IP for `node1`.
+
+After `post_k8s/post_k8s_configure.yml`, `kubectl` is prepared on `node1`, not
+on your Jupyter host by default. Unless you copy the kubeconfig locally, run
+cluster checks through SSH, for example:
+
+```bash
+ssh cc@<FLOATING_IP> 'kubectl get nodes'
+# or, if needed:
+ssh cc@<FLOATING_IP> 'sudo k3s kubectl get nodes'
+```
 
 ## 2. Bootstrap k3s
 
 ```bash
 cd ../../ansible
 cp ansible.cfg.example ansible.cfg
+eval "$(ssh-agent -s)"
+ssh-add /work/.ssh/id_rsa    # or the private key matching your uploaded keypair
 ```
 
 Edit `ansible.cfg` so the SSH host points at the `node1` floating IP, then run:
@@ -79,9 +120,19 @@ ansible-playbook -i inventory.yml k8s/install_k3s.yml
 ansible-playbook -i inventory.yml post_k8s/post_k8s_configure.yml
 ```
 
-## 3. Build and deploy substitution-serving and training
+If `general/hello_host.yml` fails with `Connection closed by UNKNOWN port
+65535`, verify the jump-host path manually before retrying Ansible:
 
-Build and push the serving and training images from this repo, then deploy the base apps:
+```bash
+ssh cc@<FLOATING_IP> hostname
+ssh -J cc@<FLOATING_IP> -o ControlMaster=no cc@192.168.1.11 hostname
+ssh -J cc@<FLOATING_IP> -o ControlMaster=no cc@192.168.1.12 hostname
+ssh -J cc@<FLOATING_IP> -o ControlMaster=no cc@192.168.1.13 hostname
+```
+
+## 3. Build and push images
+
+Build and push the serving, training, and automation images from this repo:
 
 ```bash
 cd ../serving
@@ -93,10 +144,22 @@ docker build -t ghcr.io/<your-org-or-user>/forkwise-train:$(git -C .. rev-parse 
   -f docker_nvidia/Dockerfile ..
 docker push ghcr.io/<your-org-or-user>/forkwise-train:$(git -C .. rev-parse --short HEAD)
 
+cd ../infra/automation
+docker build -t ghcr.io/<your-org-or-user>/forkwise-automation:$(git -C ../.. rev-parse --short HEAD) .
+docker push ghcr.io/<your-org-or-user>/forkwise-automation:$(git -C ../.. rev-parse --short HEAD)
+```
+
+## 4. Deploy Mealie and the bootstrap app path
+
+```bash
 cd ../infra/ansible
 ansible-playbook -i inventory.yml deploy/deploy_apps.yml \
   -e serving_image=ghcr.io/<your-org-or-user>/subst-serving-onnx:$(git -C ../.. rev-parse --short HEAD)
 ```
+
+`serving_image` must be a real `substitution-serving` image. Do not pass the
+custom Mealie image via `-e serving_image=...`; that variable also patches the
+`check-rollback` CronJob image and will wedge the serving rollout.
 
 Verify the base services:
 
@@ -115,7 +178,63 @@ You should see:
 3. `check-rollback` present in `forkwise-serving`
 4. NodePort `30090` for Mealie and `30080` for serving
 
-## 4. Create the object-store secrets
+If you only need Mealie while the serving image is still unavailable, apply the
+Mealie app by itself:
+
+```bash
+kubectl create namespace forkwise-app --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl -n forkwise-app create secret generic mealie-credentials \
+  --from-literal=postgres-user=mealie \
+  --from-literal=postgres-password=change-me \
+  --from-literal=postgres-db=mealie \
+  --from-literal=base-url=http://localhost:9000 \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl apply -k infra/k8s/apps/mealie
+kubectl rollout status deployment/mealie-postgres -n forkwise-app --timeout=180s
+kubectl rollout status deployment/mealie -n forkwise-app --timeout=240s
+```
+
+The current Mealie manifest already uses the custom UI image
+`ghcr.io/itsnotaka/mealie:ml-ui-amd64`, so the app can boot even if
+`substitution-serving` is not live yet.
+
+## 5. Create the rollout secrets for serving
+
+The new `staging`, `canary`, `production`, and `monitoring` components expect
+an `os-credentials` secret with the exact keys below wherever serving or
+automation needs model-artifact access:
+
+```bash
+for ns in monitoring-proj01 staging-proj01 canary-proj01 production-proj01; do
+  kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f -
+  kubectl create secret generic os-credentials \
+    -n "$ns" \
+    --from-literal=OS_ENDPOINT=https://chi.tacc.chameleoncloud.org:7480 \
+    --from-literal=OS_ACCESS_KEY=<YOUR_OS_ACCESS_KEY> \
+    --from-literal=OS_SECRET_KEY=<YOUR_OS_SECRET_KEY> \
+    --dry-run=client -o yaml | kubectl apply -f -
+done
+```
+
+## 6. Deploy the platform and rollout environments
+
+```bash
+cd ../infra/ansible
+ansible-playbook -i inventory.yml deploy/deploy_rollout_stack.yml \
+  -e serving_image=ghcr.io/<your-org-or-user>/subst-serving-onnx:$(git -C ../.. rev-parse --short HEAD) \
+  -e automation_image=ghcr.io/<your-org-or-user>/forkwise-automation:$(git -C ../.. rev-parse --short HEAD)
+```
+
+That playbook now does three rollout-specific tasks for you:
+
+1. deploys Prometheus, Grafana, and the automation service
+2. bootstraps `models-proj01/manifests/{staging,canary,production}.json`
+   from either the latest candidate or the legacy production artifacts
+3. deploys and restarts the serving environments so they pick up the current manifests
+
+## 7. Create the object-store secrets
 
 The data workloads expect the `s3-credentials` secret in `forkwise-data`.
 The serving deployment also expects the same secret in `forkwise-serving`
@@ -151,7 +270,7 @@ kubectl create secret docker-registry ghcr-pull \
 Then patch the default service account or add `imagePullSecrets` to the
 manifests before applying them.
 
-## 5. Apply the canonical ForkWise data manifests
+## 8. Apply the canonical ForkWise data manifests
 
 ```bash
 kubectl apply -k infra/k8s/apps/forkwise-data
@@ -178,7 +297,7 @@ kubectl get cronjobs -n forkwise-data
 kubectl get cronjob training-trigger -n forkwise-data
 ```
 
-## 6. Seed object storage once with the ingest job
+## 9. Seed object storage once with the ingest job
 
 The data stack is not ready until `data-proj01` has the validated raw splits and
 holdout set. Run the one-time ingest job:
@@ -196,7 +315,7 @@ Success means:
 3. `data/production_holdout/holdout.json` was written
 4. a QC1 report was written under `data/quality_reports/`
 
-## 7. Turn on the live workloads
+## 10. Turn on the live workloads
 
 Once ingest is complete and `substitution-serving` is healthy, enable the rest:
 
@@ -216,7 +335,7 @@ kubectl get cronjobs -n forkwise-data
 kubectl get cronjob training-trigger -n forkwise-data
 ```
 
-## 8. Smoke-test the stack
+## 11. Smoke-test the stack
 
 Tunnel to the NodePorts from your laptop:
 
@@ -236,7 +355,7 @@ curl -X POST http://localhost:8001/feedback \
   -d '{"request_id":"demo-1","recipe_id":"123","missing_ingredient":"sour cream","suggested_substitution":"greek yogurt","user_accepted":true}'
 ```
 
-## 9. Teammate self-demo with Docker
+## 12. Teammate self-demo with Docker
 
 If a teammate only wants to verify the published images, they can run them
 outside Kubernetes.
@@ -318,7 +437,7 @@ docker run --rm \
   ghcr.io/itsnotaka/forkwise-generator:demo
 ```
 
-## 10. What to do if something fails
+## 13. What to do if something fails
 
 1. `forkwise-ingest` fails:
    check the job logs first; object-store credentials or outbound internet access

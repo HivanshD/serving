@@ -35,7 +35,27 @@ ForkWise data images:
 - `forkwise-serving` for the primary serving API
 - `forkwise-data` for feedback, ingest, generator, batch, and drift workloads
 
-Use `infra/docs/FORKWISE_CLOUD_SETUP.md` for the step-by-step cloud bring-up.
+That bootstrap path is useful for cluster bring-up, and the repo now also
+includes an initial rollout implementation under `infra/k8s/platform/`,
+`infra/k8s/staging/`, `infra/k8s/canary/`, and `infra/k8s/production/`.
+
+The remaining work for full rubric credit is narrower now:
+
+- validate the rollout loop live on Chameleon under traffic
+- verify the custom Mealie flow against the production rollout path
+- decide whether the current synthetic canary split is sufficient or whether to add ingress-based traffic splitting
+- keep one unified set of buckets, registries, and monitoring services rather than duplicated role-owned stacks
+
+Use these docs as the canonical entry points:
+
+- `infra/docs/FORKWISE_CLOUD_SETUP.md` for cloud bootstrap and target-state notes
+- `infra/docs/DEVOPS_RUBRIC_MAP.md` for the DevOps rubric-to-repo mapping
+- `infra/docs/EXTERNAL_ACCESS.md` for reviewer/professor SSH tunnel access to Mealie, serving, Grafana, and Prometheus
+
+`infra/docs/FORKWISE_CLOUD_SETUP.md` also includes the practical Jupyter-host
+details that came up during real deployment: explicit Terraform/OpenStack env
+setup, lease-backed `flavor_id` usage, SSH-agent loading for Ansible, and a
+Mealie-only fallback path when the serving image is not ready yet.
 
 ## Published ForkWise data images
 
@@ -45,4 +65,3 @@ ghcr.io/itsnotaka/forkwise-feedback:demo
 ghcr.io/itsnotaka/forkwise-batch:demo
 ghcr.io/itsnotaka/forkwise-generator:demo
 ```
-
