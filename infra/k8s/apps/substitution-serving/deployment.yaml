@@ -14,7 +14,7 @@ spec:
         app: substitution-serving
     spec:
       nodeSelector:
-        kubernetes.io/hostname: node1
+        forkwise.io/entrypoint: "true"
       containers:
         - name: substitution-serving
           image: substitution-serving:local

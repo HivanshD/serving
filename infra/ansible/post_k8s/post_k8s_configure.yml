@@ -50,6 +50,16 @@
       failed_when: false
       changed_when: false
 
+    - name: Label the entrypoint node for pinned app workloads
+      ansible.builtin.shell: >-
+        kubectl label node "$(hostname)" forkwise.io/entrypoint=true --overwrite
+      args:
+        executable: /bin/bash
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+      register: entrypoint_label
+      changed_when: "'labeled' in entrypoint_label.stdout"
+
     - name: Verify kubectl nodes
       ansible.builtin.command: kubectl get nodes
       environment:

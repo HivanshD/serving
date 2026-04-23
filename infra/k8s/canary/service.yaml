@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: subst-serving
+  namespace: canary-proj01
+spec:
+  selector:
+    app: subst-serving
+  ports:
+    - port: 8000
+      targetPort: 8000
+      nodePort: 31081
+  type: NodePort

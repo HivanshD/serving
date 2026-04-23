@@ -1,14 +1,16 @@
 # Mealie Kubernetes App
 
-This directory is the canonical home for Mealie deployment assets.
+This directory is the canonical home for the reusable Mealie deployment assets.
 
 ## Why It Exists
 
-The course lab often represents application environments as `staging`, `canary`, and `production`.
+The manifests here are the current bootstrap or base manifests for Mealie.
 
-This repo intentionally does not do that yet.
-
-For this migration phase, we only need a clear and truthful home for the open-source application deployment.
+For the final four-person system-implementation target, Mealie should be wired
+into the integrated rollout story rather than treated as a standalone app-only
+exception. In practice that means these manifests should feed the final
+`staging`, `canary`, or `production` layout instead of being the only cluster
+representation of the application.
 
 ## What Is Here Now
 
@@ -19,7 +21,7 @@ This directory now contains a first raw-manifest pass for:
 3. persistent volume claims for app and database data
 4. a NodePort service for Mealie on `30090`
 5. an integration `ConfigMap` declaring the in-cluster substitution-serving and feedback URLs
-6. stateful workloads pinned to `node1` for simpler local-path storage behavior
+6. stateful workloads pinned to the entrypoint/control node via the `forkwise.io/entrypoint=true` label for simpler local-path storage behavior
 
 Apply with:
 
@@ -43,15 +45,20 @@ kubectl -n forkwise-app create secret generic mealie-credentials \
 
 Do not commit live credentials to Git.
 
-## Future Integration Targets
+## Integration Wiring
 
 The intended in-cluster service contracts for Mealie-side integration are:
 
-1. `http://substitution-serving.forkwise-serving.svc.cluster.local:8000/predict`
+1. `http://subst-serving.production-proj01.svc.cluster.local:8000/predict`
 2. `http://subst-feedback.forkwise-data.svc.cluster.local:8001/feedback`
 
-This repo does not yet implement the application-side hook, but these are the
-service contract locations that future work should target.
+The custom Mealie image consumes these values from the `forkwise-integration`
+`ConfigMap` via `SUBSTITUTION_API_URL` and `SUBSTITUTION_FEEDBACK_URL`.
+
+## Custom Image
+
+The current custom image is published at `ghcr.io/itsnotaka/mealie:ml-ui-amd64`.
+If the package is public in GHCR, no Kubernetes image pull secret is required.
 
 ## Mealie-Only Fallback
 

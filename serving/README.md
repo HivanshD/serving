@@ -47,12 +47,11 @@ serving options table.
 All serving containers follow the same pattern:
 
 1. Container starts → `scripts/reload_model.py` runs first
-2. It downloads the current production model from `models-proj01`:
-   - PyTorch container: `production/subst_model_current.pth`
-   - ONNX container: `production/subst_model_current.onnx` + `production/vocab.json`
-3. If download fails, containers still start with stub random weights so
+2. In the rollout path, it resolves an environment-specific manifest from `models-proj01/manifests/{staging,canary,production}.json`
+3. The manifest points at versioned candidate artifacts under `models-proj01/versions/<model_version>/`
+4. If download fails, containers still start with stub random weights so
    pods don't crash-loop during incidents
-4. Uvicorn / tritonserver launches and binds port 8000
+5. Uvicorn / tritonserver launches and binds port 8000
 
 ---
 
@@ -112,13 +111,20 @@ Serving provides the container image tags they reference:
 
 | Image tag | Built from | Deployed to |
 |-----------|-----------|-------------|
-| `subst-serving-onnx:v{git_sha}` | `Dockerfile.fastapi_onnx` | `forkwise-serving` |
+| `subst-serving-onnx:v{git_sha}` | `Dockerfile.fastapi_onnx` | `staging-proj01`, `canary-proj01`, `production-proj01` |
 | `subst-serving-pt:v{git_sha}` | `Dockerfile.fastapi_pt` | (optional baseline) |
 | `subst-triton:v{git_sha}` | `Dockerfile.triton` | (benchmarking only) |
 
-The current canonical deploy path is the app-oriented layout under
-`infra/k8s/apps/substitution-serving/`, not the older multi-environment
-`staging/canary/production` layout.
+The canonical rollout path is now the multi-environment layout under:
+
+- `infra/k8s/platform/`
+- `infra/k8s/staging/`
+- `infra/k8s/canary/`
+- `infra/k8s/production/`
+
+The older app-oriented path under `infra/k8s/apps/substitution-serving/` is
+still useful as a bootstrap base, but it is no longer the main system-
+implementation path.
 
 ---
 

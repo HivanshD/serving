@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: subst-serving
+  namespace: production-proj01
+spec:
+  selector:
+    app: subst-serving
+  ports:
+    - port: 8000
+      targetPort: 8000
+      nodePort: 31080
+  type: NodePort

@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-provisioning
+  namespace: monitoring-proj01
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        uid: forkwise-prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus.monitoring-proj01:9090
+        isDefault: true
+        editable: true
+
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: ForkWise
+        orgId: 1
+        folder: ForkWise
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/forkwise

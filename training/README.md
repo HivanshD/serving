@@ -58,9 +58,9 @@ Override config values via CLI:
 
 ## Quality Gate
 
-- Threshold: MRR@3 >= 0.30
+- Threshold: MRR@3 >= 0.15
 - Random baseline: ~0.10
-- Models that pass: saved to `models-proj01/production/subst_model_current.pth` + registered in MLflow
+- Models that pass: saved as versioned candidate artifacts in `models-proj01/versions/` and published as candidate manifests in `models-proj01/candidates/`
 - Models that fail: logged in MLflow with `quality_gate: failed` tag, not saved
 
 ## Object Storage Paths
@@ -70,7 +70,9 @@ READS:  data-proj01/raw/recipe1msubs/{train,val,test}.json
 READS:  data-proj01/triggers/retrain_*.json
 READS:  data-proj01/processed/train_v*.json
 WRITES: models-proj01/checkpoints/subst_model_v{run_id}.pth
-WRITES: models-proj01/production/subst_model_current.pth
+WRITES: models-proj01/versions/<model_version>/{subst_model.pth,subst_model.onnx,vocab.json}
+WRITES: models-proj01/candidates/<model_version>.json
+WRITES: models-proj01/candidates/latest.json
 WRITES: MLflow model registry
 ```
 | Order | Run | embed_dim | lr | epochs | batch_size | margin | Time |
@@ -84,4 +86,3 @@ WRITES: MLflow model registry
 | 7 | final-best | 4096 | 0.00003 | 50 | 8 | 2.0 | ~51 min |
 | 8 | final-best-v2 | 4096 | 0.00001 | 100 | 8 | 2.0 | ~2 hrs |
 | 9 | gismo-final | 4096 | 0.00001 | 100 | 8 | 2.0 | ~2 hrs |
-

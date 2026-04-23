@@ -2,9 +2,10 @@
 serve_onnx.py - Production FastAPI + ONNX Runtime endpoint
 
 INTEGRATION CONTRACTS (verified against actual teammate code):
-  - Single bucket: data-proj01
-  - Request logs -> data-proj01/logs/requests/  (drift_monitor.py reads here)
-  - Model loaded from data-proj01/models/production/
+  - Primary data bucket: data-proj01 (request logs, default model keys)
+  - Request logs → data-proj01/logs/requests/  (drift_monitor.py reads here)
+  - Model artifacts: MODEL_BUCKET + MODEL_MANIFEST_KEY (reload_model.py), or
+    data-proj01/models/production/ when using direct keys
   - Stub fallback matches training's architecture: .mean(dim=1), no padding mask
   - Response includes serving_version, model_version, and latency_ms
 """
@@ -58,6 +59,17 @@ REQUESTS = Counter("subst_requests_total", "Requests by status", ["status"])
 OOV_MISSING = Counter("subst_oov_missing_total", "Missing ingredient was OOV")
 MODEL_LOADED = Gauge("subst_model_loaded", "1=real model, 0=stub")
 INFLIGHT = Gauge("subst_inflight_requests", "In-flight requests")
+REQUEST_LATENCY = Histogram(
+    "subst_request_latency_seconds",
+    "End-to-end request latency in seconds",
+    ["status"],
+    buckets=[0.05, 0.1, 0.2, 0.35, 0.5, 0.75, 1.0, 2.0, 5.0],
+)
+REQUESTS_TOTAL = Counter(
+    "subst_requests_total",
+    "Total inference requests",
+    ["status"],
+)
 
 # ------------------------------------------------------------------
 # State
@@ -162,8 +174,26 @@ def _load_metadata():
         print(f"[startup] Metadata load failed: {e}")
 
 
+def _load_model_version_from_metadata():
+    global _model_version
+    if not os.path.exists(MODEL_METADATA_PATH):
+        return
+    try:
+        with open(MODEL_METADATA_PATH) as f:
+            metadata = json.load(f)
+        _model_version = (
+            metadata.get("model_version")
+            or metadata.get("run_name")
+            or metadata.get("run_id")
+            or _model_version)
+    except Exception as e:
+        print(f"[startup] Model metadata load failed: {e}")
+
+
 def load_model():
     global _session, _vocab, _id_to_ingredient
+
+    _load_model_version_from_metadata()
 
     if os.path.exists(VOCAB_PATH):
         try:
@@ -434,6 +464,7 @@ def health():
 def predict(req: PredictRequest):
     start = time.perf_counter()
     request_id = req.request_id or f"req_{uuid.uuid4().hex[:8]}"
+    status = "success"
     INFLIGHT.inc()
     try:
         _maybe_refresh_model()
@@ -461,6 +492,7 @@ def predict(req: PredictRequest):
         log_request(request_id, req.model_dump(), result, status="ok")
         return result
     except Exception as e:
+        status = "error"
         print(f"[predict] ERROR {request_id}: {e}")
         elapsed = time.perf_counter() - start
         latency_ms = int(elapsed * 1000)
@@ -483,6 +515,9 @@ def predict(req: PredictRequest):
         )
         raise HTTPException(status_code=500, detail=str(e))
     finally:
+        duration = time.perf_counter() - start
+        REQUESTS_TOTAL.labels(status=status).inc()
+        REQUEST_LATENCY.labels(status=status).observe(duration)
         INFLIGHT.dec()
 
 

@@ -18,7 +18,7 @@ This directory now contains a first raw-manifest pass for:
 2. deployment
 3. a NodePort service on `30080`
 4. readiness and liveness probes on `/health`
-5. pod pinning to `node1` for predictable tunneling and simpler first deployment behavior
+5. pod pinning to the entrypoint/control node via the `forkwise.io/entrypoint=true` label for predictable tunneling and simpler first deployment behavior
 
 Apply with:
 

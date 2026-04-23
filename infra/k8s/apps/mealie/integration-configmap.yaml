@@ -4,5 +4,5 @@ metadata:
   name: forkwise-integration
   namespace: forkwise-app
 data:
-  SUBSTITUTION_API_URL: http://substitution-serving.forkwise-serving.svc.cluster.local:8000/predict
+  SUBSTITUTION_API_URL: http://subst-serving.production-proj01.svc.cluster.local:8000/predict
   SUBSTITUTION_FEEDBACK_URL: http://subst-feedback.forkwise-data.svc.cluster.local:8001/feedback

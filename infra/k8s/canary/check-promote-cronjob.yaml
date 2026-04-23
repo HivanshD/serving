@@ -1,0 +1,38 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: check-promote
+  namespace: canary-proj01
+spec:
+  schedule: "*/5 * * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: subst-cronjob-sa
+          restartPolicy: Never
+          containers:
+            - name: check-promote
+              image: subst-serving-onnx:latest
+              imagePullPolicy: IfNotPresent
+              command: ["python", "/app/scripts/check_promote.py"]
+              env:
+                - name: PROMETHEUS_URL
+                  value: "http://prometheus.monitoring-proj01:9090"
+                - name: DEVOPS_HOOK
+                  value: "http://automation.monitoring-proj01:8080"
+                - name: CANARY_NS
+                  value: "canary-proj01"
+                - name: PROD_NS
+                  value: "production-proj01"
+                - name: DEPLOYMENT_NAME
+                  value: "subst-serving"
+                - name: LATENCY_RATIO_LIMIT
+                  value: "1.1"
+                - name: CANARY_ERROR_LIMIT
+                  value: "0.02"
+                - name: CANARY_MIN_AGE_MIN
+                  value: "30"

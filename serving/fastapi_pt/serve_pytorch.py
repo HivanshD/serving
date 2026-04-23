@@ -23,6 +23,7 @@ from model_stub import (
 )
 
 MODEL_PATH = os.getenv("MODEL_PATH", "/app/model.pth")
+MODEL_METADATA_PATH = os.getenv("MODEL_METADATA_PATH", "/app/model_metadata.json")
 LOG_REQUESTS = os.getenv("LOG_REQUESTS", "true").lower() == "true"
 REQUEST_LOG_BUCKET = os.getenv("REQUEST_LOG_BUCKET", "data-proj01")
 SERVING_VERSION = os.getenv("SERVING_VERSION", "pytorch-baseline")
@@ -32,6 +33,17 @@ TOP1_SCORE = Histogram("subst_top1_embedding_score",
 OOV_MISSING = Counter("subst_oov_missing_total", "Missing ingredient was OOV")
 MODEL_LOADED = Gauge("subst_model_loaded", "1=real model, 0=stub")
 INFLIGHT = Gauge("subst_inflight_requests", "In-flight requests")
+REQUEST_LATENCY = Histogram(
+    "subst_request_latency_seconds",
+    "End-to-end request latency in seconds",
+    ["status"],
+    buckets=[0.05, 0.1, 0.2, 0.35, 0.5, 0.75, 1.0, 2.0, 5.0],
+)
+REQUESTS_TOTAL = Counter(
+    "subst_requests_total",
+    "Total inference requests",
+    ["status"],
+)
 
 _model = None
 _vocab = {}
@@ -39,8 +51,25 @@ _id_to_ingredient = {}
 _model_version = "unknown"
 
 
+def _load_model_version_from_metadata():
+    global _model_version
+    if not os.path.exists(MODEL_METADATA_PATH):
+        return
+    try:
+        with open(MODEL_METADATA_PATH) as f:
+            metadata = json.load(f)
+        _model_version = (
+            metadata.get("model_version")
+            or metadata.get("run_name")
+            or metadata.get("run_id")
+            or _model_version)
+    except Exception as e:
+        print(f"[startup] Model metadata load failed: {e}")
+
+
 def load_model():
     global _model, _vocab, _id_to_ingredient, _model_version
+    _load_model_version_from_metadata()
     if os.path.exists(MODEL_PATH):
         try:
             ckpt = torch.load(MODEL_PATH, map_location="cpu", weights_only=False)
@@ -53,7 +82,7 @@ def load_model():
             _model = model
             _vocab = vocab
             _id_to_ingredient = {v: k for k, v in vocab.items()}
-            _model_version = config.get("run_name", "unknown")
+            _model_version = config.get("model_version") or config.get("run_name") or _model_version
             MODEL_LOADED.set(1)
             print(f"[startup] Loaded model. vocab={len(vocab)} embed_dim={embed_dim}")
             return
@@ -156,6 +185,7 @@ def health():
 def predict(req: PredictRequest):
     start = time.perf_counter()
     request_id = req.request_id or f"req_{uuid.uuid4().hex[:8]}"
+    status = "success"
     INFLIGHT.inc()
     try:
         top_k = max(1, min(req.top_k or 3, 10))
@@ -197,9 +227,13 @@ def predict(req: PredictRequest):
         log_request(request_id, req.model_dump(), result)
         return result
     except Exception as e:
+        status = "error"
         print(f"[predict] ERROR {request_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
+        duration = time.perf_counter() - start
+        REQUESTS_TOTAL.labels(status=status).inc()
+        REQUEST_LATENCY.labels(status=status).observe(duration)
         INFLIGHT.dec()
 
 Instrumentator().instrument(app).expose(app)

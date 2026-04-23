@@ -8,7 +8,9 @@ data:
   BUCKET: data-proj01
   MODEL_PREFIX: models
   VAL_DATASET_KEY: data/raw/recipe1msubs/val.json
-  SERVING_URL: http://substitution-serving.forkwise-serving.svc.cluster.local:8000/predict
+  SERVING_URL: http://subst-serving.production-proj01.svc.cluster.local:8000/predict
+  CANARY_SERVING_URL: http://subst-serving.canary-proj01.svc.cluster.local:8000/predict
+  CANARY_TRAFFIC_PERCENT: "0.10"
   REQUESTS_PER_SEC: "1"
   MIN_NEW_SAMPLES: "50"
   OOV_THRESHOLD: "0.15"

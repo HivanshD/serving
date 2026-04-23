@@ -80,5 +80,7 @@ kubectl get cronjob training-trigger -n forkwise-data
 ## In-Cluster Contracts
 
 1. Feedback endpoint: `http://subst-feedback.forkwise-data.svc.cluster.local:8001/feedback`
-2. Serving endpoint consumed by generator: `http://substitution-serving.forkwise-serving.svc.cluster.local:8000/predict`
-3. Retraining trigger prefix watched by training: `data/triggers/`
+2. Production serving endpoint consumed by generator: `http://subst-serving.production-proj01.svc.cluster.local:8000/predict`
+3. Canary serving endpoint for rollout validation: `http://subst-serving.canary-proj01.svc.cluster.local:8000/predict`
+4. Single-namespace fallback (bootstrap path): `http://substitution-serving.forkwise-serving.svc.cluster.local:8000/predict`
+5. Retraining trigger prefix watched by training: `data/triggers/`

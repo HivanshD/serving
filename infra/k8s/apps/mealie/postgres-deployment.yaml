@@ -14,7 +14,7 @@ spec:
         app: mealie-postgres
     spec:
       nodeSelector:
-        kubernetes.io/hostname: node1
+        forkwise.io/entrypoint: "true"
       containers:
         - name: postgres
           image: postgres:17

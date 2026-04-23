@@ -4,8 +4,8 @@ export_onnx.py — Converts PyTorch checkpoint to ONNX opset 14.
 NOTE: Training's train.py already does ONNX export inline after quality gate.
 This script exists for manual re-exports or if training's inline export fails.
 
-Bucket: data-proj01
-Keys:   models/production/subst_model_current.{pth,onnx}, models/production/vocab.json
+Bucket: models-proj01
+Keys:   production/subst_model_current.{pth,onnx}, production/vocab.json
 """
 
 import argparse, json, os, sys, tempfile
@@ -52,13 +52,13 @@ def export(checkpoint_path, onnx_path, vocab_path):
 
 def export_from_object_storage():
     import boto3
-    bucket = os.getenv("MODEL_BUCKET", "data-proj01")
+    bucket = os.getenv("MODEL_BUCKET", "models-proj01")
     in_key = os.getenv("INPUT_CHECKPOINT_KEY",
-                        "models/production/subst_model_current.pth")
+                        "production/subst_model_current.pth")
     out_onnx_key = os.getenv("OUTPUT_ONNX_KEY",
-                               "models/production/subst_model_current.onnx")
+                               "production/subst_model_current.onnx")
     out_vocab_key = os.getenv("OUTPUT_VOCAB_KEY",
-                                "models/production/vocab.json")
+                                "production/vocab.json")
     s3 = boto3.client("s3", endpoint_url=os.getenv("OS_ENDPOINT"),
         aws_access_key_id=os.getenv("OS_ACCESS_KEY"),
         aws_secret_access_key=os.getenv("OS_SECRET_KEY"))

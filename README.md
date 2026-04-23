@@ -26,10 +26,10 @@ on Recipe1MSubs.
 - Infra migration notes: `infra/docs/`
 - Historical serving integration notes: `serving/INTEGRATION.md`
 
-## Canonical cloud path
+## Deployment Status
 
-The current canonical deployment uses app-oriented namespaces and GHCR-backed
-ForkWise data images:
+The repo currently includes a working bootstrap path on Chameleon using the
+app-oriented namespaces below:
 
 - `forkwise-app` for Mealie
 - `forkwise-serving` for the primary serving API

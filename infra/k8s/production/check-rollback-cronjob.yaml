@@ -1,0 +1,31 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: check-rollback
+  namespace: production-proj01
+spec:
+  schedule: "*/5 * * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: check-rollback
+              image: subst-serving-onnx:latest
+              imagePullPolicy: IfNotPresent
+              command: ["python", "/app/scripts/check_rollback.py"]
+              env:
+                - name: PROMETHEUS_URL
+                  value: "http://prometheus.monitoring-proj01:9090"
+                - name: DEVOPS_HOOK
+                  value: "http://automation.monitoring-proj01:8080"
+                - name: NAMESPACE
+                  value: "production-proj01"
+                - name: LATENCY_P95_THRESHOLD_S
+                  value: "0.5"
+                - name: ERROR_RATE_THRESHOLD
+                  value: "0.05"

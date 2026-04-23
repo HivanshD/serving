@@ -1,0 +1,126 @@
+---
+- name: Deploy system-implementation rollout stack
+  hosts: node1
+  become: true
+  vars:
+    kubeconfig_path: /etc/rancher/k3s/k3s.yaml
+    remote_k8s_path: /tmp/serving-k8s
+    serving_image: subst-serving-onnx:latest
+    automation_image: forkwise-automation:local
+  tasks:
+    - name: Ensure remote k8s directory exists
+      ansible.builtin.file:
+        path: "{{ remote_k8s_path }}"
+        state: directory
+        mode: "0755"
+
+    - name: Copy k8s manifests to node1
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../k8s/"
+        dest: "{{ remote_k8s_path }}/"
+        mode: preserve
+
+    - name: Apply platform services
+      ansible.builtin.command: kubectl apply -k {{ remote_k8s_path }}/platform
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: true
+
+    - name: Set automation image
+      ansible.builtin.command: >-
+        kubectl set image deployment/automation
+        automation={{ automation_image }}
+        -n monitoring-proj01
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: true
+
+    - name: Wait for Prometheus rollout
+      ansible.builtin.command: kubectl rollout status deployment/prometheus -n monitoring-proj01 --timeout=180s
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: false
+
+    - name: Wait for Grafana rollout
+      ansible.builtin.command: kubectl rollout status deployment/grafana -n monitoring-proj01 --timeout=180s
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: false
+
+    - name: Wait for automation rollout
+      ansible.builtin.command: kubectl rollout status deployment/automation -n monitoring-proj01 --timeout=180s
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: false
+
+    - name: Bootstrap rollout manifests in object storage
+      ansible.builtin.command: >-
+        kubectl exec -n monitoring-proj01 deploy/automation --
+        curl -fsS -X POST http://127.0.0.1:8080/bootstrap-rollout
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      register: bootstrap_rollout
+      changed_when: true
+
+    - name: Show bootstrap rollout result
+      ansible.builtin.debug:
+        msg: "{{ bootstrap_rollout.stdout_lines }}"
+
+    - name: Apply rollout environments
+      ansible.builtin.command: kubectl apply -k {{ remote_k8s_path }}/{{ item }}
+      loop:
+        - staging
+        - canary
+        - production
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: true
+
+    - name: Set serving image in rollout environments
+      ansible.builtin.command: >-
+        kubectl set image deployment/subst-serving
+        subst-serving={{ serving_image }}
+        -n {{ item }}-proj01
+      loop:
+        - staging
+        - canary
+        - production
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: true
+
+    - name: Restart rollout-environment serving deployments to pick up manifest changes
+      ansible.builtin.command: kubectl rollout restart deployment/subst-serving -n {{ item }}-proj01
+      loop:
+        - staging
+        - canary
+        - production
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: true
+
+    - name: Wait for rollout-environment serving deployments
+      ansible.builtin.command: kubectl rollout status deployment/subst-serving -n {{ item }}-proj01 --timeout=240s
+      loop:
+        - staging
+        - canary
+        - production
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: false
+
+    - name: Show rollout stack services
+      ansible.builtin.command: kubectl get svc -n {{ item }}
+      loop:
+        - monitoring-proj01
+        - staging-proj01
+        - canary-proj01
+        - production-proj01
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      register: rollout_svc_status
+      changed_when: false
+
+    - name: Print rollout stack service status
+      ansible.builtin.debug:
+        msg: "{{ rollout_svc_status.results | map(attribute='stdout_lines') | flatten }}"

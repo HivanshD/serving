@@ -85,13 +85,13 @@ def get_deployment_age_minutes(namespace: str, name: str):
 def main():
     latency_template = (
         'histogram_quantile(0.95, '
-        'rate(subst_request_latency_seconds_bucket'
-        '{{namespace="{ns}"}}[10m]))'
+        'sum by (le) (rate(subst_request_latency_seconds_bucket'
+        '{{namespace="{ns}"}}[10m])))'
     )
     error_template = (
-        'rate(subst_requests_total'
-        '{{namespace="{ns}",status="error"}}[5m]) / '
-        'rate(subst_requests_total{{namespace="{ns}"}}[5m])'
+        'sum(rate(subst_requests_total'
+        '{{namespace="{ns}",status="error"}}[5m])) / '
+        'sum(rate(subst_requests_total{{namespace="{ns}"}}[5m]))'
     )
 
     canary_p95 = query_prom_namespace(CANARY_NS, latency_template)

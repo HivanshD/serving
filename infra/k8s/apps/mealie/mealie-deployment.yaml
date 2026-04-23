@@ -14,10 +14,10 @@ spec:
         app: mealie
     spec:
       nodeSelector:
-        kubernetes.io/hostname: node1
+        forkwise.io/entrypoint: "true"
       containers:
         - name: mealie
-          image: ghcr.io/mealie-recipes/mealie:v3.10.1
+          image: ghcr.io/itsnotaka/mealie:ml-ui-amd64
           ports:
             - containerPort: 9000
           env:
@@ -55,6 +55,16 @@ spec:
                 secretKeyRef:
                   name: mealie-credentials
                   key: postgres-db
+            - name: SUBSTITUTION_API_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: forkwise-integration
+                  key: SUBSTITUTION_API_URL
+            - name: SUBSTITUTION_FEEDBACK_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: forkwise-integration
+                  key: SUBSTITUTION_FEEDBACK_URL
           volumeMounts:
             - name: mealie-data
               mountPath: /app/data

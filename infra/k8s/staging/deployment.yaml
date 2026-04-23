@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: subst-serving
+  namespace: staging-proj01
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: subst-serving
+  template:
+    metadata:
+      labels:
+        app: subst-serving
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: subst-serving
+          image: subst-serving-onnx:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: MODEL_BUCKET
+              value: models-proj01
+            - name: MODEL_MANIFEST_KEY
+              value: manifests/staging.json
+            - name: ALLOW_DIRECT_FALLBACK
+              value: "false"
+            - name: REQUEST_LOG_BUCKET
+              value: data-proj01
+            - name: SERVING_VERSION
+              value: staging-onnx
+            - name: OS_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: os-credentials
+                  key: OS_ENDPOINT
+            - name: OS_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: os-credentials
+                  key: OS_ACCESS_KEY
+            - name: OS_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: os-credentials
+                  key: OS_SECRET_KEY
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi

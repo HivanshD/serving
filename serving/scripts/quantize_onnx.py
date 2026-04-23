@@ -1,6 +1,6 @@
 """
 quantize_onnx.py — Dynamic INT8 quantization. Uses onnxruntime.quantization (not INC).
-Bucket: data-proj01, keys under models/production/
+Bucket: models-proj01, keys under production/
 """
 
 import argparse, os, sys, tempfile
@@ -21,11 +21,11 @@ def quantize(input_path, output_path):
 
 def quantize_from_object_storage():
     import boto3
-    bucket = os.getenv("MODEL_BUCKET", "data-proj01")
+    bucket = os.getenv("MODEL_BUCKET", "models-proj01")
     in_key = os.getenv("INPUT_ONNX_KEY",
-                        "models/production/subst_model_current.onnx")
+                        "production/subst_model_current.onnx")
     out_key = os.getenv("OUTPUT_ONNX_KEY",
-                         "models/production/subst_model_quantized.onnx")
+                         "production/subst_model_quantized.onnx")
     s3 = boto3.client("s3", endpoint_url=os.getenv("OS_ENDPOINT"),
         aws_access_key_id=os.getenv("OS_ACCESS_KEY"),
         aws_secret_access_key=os.getenv("OS_SECRET_KEY"))

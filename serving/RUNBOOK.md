@@ -76,7 +76,7 @@ kubectl scale deploy/subst-serving --replicas=1 -n production-proj01
 ```bash
 # Latency by quantile
 curl -s http://<prometheus>:9090/api/v1/query \
-  --data-urlencode 'query=histogram_quantile(0.95, rate(subst_request_latency_seconds_bucket{namespace="production-proj01"}[10m]))'
+  --data-urlencode 'query=histogram_quantile(0.95, sum by (le) (rate(subst_request_latency_seconds_bucket{namespace="production-proj01"}[10m])))'
 
 # CPU / memory
 kubectl top pods -n production-proj01

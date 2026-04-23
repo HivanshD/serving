@@ -1,8 +1,8 @@
 # ForkWise Cloud Setup
 
-This is the canonical step-by-step runbook for bringing up the current
-ForkWise stack on a cloud Kubernetes environment, with the data-plane images
-pulled from GHCR instead of built ad hoc on the cluster.
+This is the canonical step-by-step runbook for bringing up ForkWise on a cloud
+Kubernetes environment, with the data-plane images pulled from GHCR instead of
+built ad hoc on the cluster.
 
 The current manifests can bootstrap the cluster and the base apps, and the repo
 now also includes an initial rollout implementation for the shared platform and
@@ -25,6 +25,14 @@ For reviewer and professor access via SSH tunnels, read `infra/docs/EXTERNAL_ACC
    - `training-trigger`
    - one-time `forkwise-ingest` bootstrap job
 
+## What still must be finished for full four-person system-implementation credit
+
+1. complete the remaining end-to-end validation across data, training, serving, and Mealie
+2. validate the live dashboards, CronJobs, and rollout rules on Chameleon under traffic
+3. verify the custom Mealie flow against the production rollout path
+4. decide whether the current synthetic canary traffic split is sufficient or whether to add ingress-based traffic splitting
+5. keep shared services unified rather than duplicated across roles
+
 ## Canonical GHCR images
 
 ```text
@@ -46,7 +54,7 @@ You need:
 3. OpenStack object-store credentials for `data-proj01`
 4. A registry image for `substitution-serving`, or a local build/push plan for it
 5. A registry image for `forkwise-train`, or a local build/push plan for it
-6. A registry image for `infra/automation`, or a local build/push plan for it
+6. A registry image for `infra/automation` (rollout path), or a local build/push plan for it
 
 If the GHCR packages are private, log in before you do anything else:
 
@@ -335,6 +343,10 @@ kubectl get cronjobs -n forkwise-data
 kubectl get cronjob training-trigger -n forkwise-data
 ```
 
+The data generator now supports a synthetic canary split using
+`CANARY_SERVING_URL` and `CANARY_TRAFFIC_PERCENT`, so the default config can
+exercise both production and canary serving during rollout validation.
+
 ## 11. Smoke-test the stack
 
 Tunnel to the NodePorts from your laptop:
@@ -455,6 +467,14 @@ docker run --rm \
 6. CronJobs stay suspended:
    this is intentional for `batch-pipeline` and `drift-monitor` until you
    explicitly unsuspend them.
+7. `substitution-serving`, `mealie`, or `mealie-postgres` stay `Pending` after deploy:
+   check the pod events for `node affinity/selector` failures. The deploy path pins these workloads to the control/entrypoint node with the `forkwise.io/entrypoint=true` label instead of assuming the hostname is literally `node1`. If you created the cluster before this label task existed, run:
+
+```bash
+ssh cc@<FLOATING_IP> 'kubectl label node "$(hostname)" forkwise.io/entrypoint=true --overwrite'
+```
+
+   then restart the affected deployments.
 
 This file is the canonical cloud bring-up doc for the unreleased GHCR-based
 ForkWise deployment.

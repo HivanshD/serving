@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: monitoring-proj01
+resources:
+  - namespace.yaml
+  - prometheus-serviceaccount.yaml
+  - prometheus-rbac.yaml
+  - prometheus-configmap.yaml
+  - prometheus-pvc.yaml
+  - prometheus-deployment.yaml
+  - prometheus-service.yaml
+  - grafana-secret.yaml
+  - grafana-provisioning-configmap.yaml
+  - grafana-dashboard-configmap.yaml
+  - grafana-pvc.yaml
+  - grafana-deployment.yaml
+  - grafana-service.yaml
+  - automation-serviceaccount.yaml
+  - automation-rbac.yaml
+  - automation-deployment.yaml
+  - automation-service.yaml

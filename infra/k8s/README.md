@@ -1,8 +1,9 @@
 # Kubernetes Layout
 
-This directory is the canonical home for Kubernetes application manifests.
+This directory is the canonical home for Kubernetes manifests for the integrated
+ForkWise system.
 
-## Layout
+## Current State
 
 ```text
 k8s/
@@ -10,19 +11,44 @@ k8s/
 │   ├── forkwise-data/
 │   ├── mealie/
 │   └── substitution-serving/
-└── platform/
+├── platform/
+├── staging/
+├── canary/
+└── production/
 ```
 
-## Direction
+The repo now contains both:
 
-The repository intentionally uses app-oriented names instead of the course lab's `staging/canary/production` layout.
+1. bootstrap app manifests under `apps/`
+2. the rollout and platform directories needed for the four-person Kubernetes target
 
-That is because this migration phase is focused on a minimal integrated system rather than a multi-environment rollout model.
+The `apps/` manifests are still useful for first cloud bring-up and as reusable
+bases for Mealie, serving, and data workloads.
 
-The current first-pass deployment choices are:
+## Apr 20 / Final Target
 
-1. app workloads are pinned to `node1` for simpler persistent-volume behavior
-2. browser-facing access uses NodePorts on `node1`
-3. the recommended user path is SSH tunneling through the single floating IP
-4. data-plane workloads live in `apps/forkwise-data/` and pull their canonical
-   images from GHCR
+For a four-person team, the course rubric requires the integrated Kubernetes
+system to support:
+
+1. shared platform services deployed once for the whole system
+2. separate `staging`, `canary`, and `production` environments
+3. automated promotion and rollback rules
+4. monitoring, alerting, and autoscaling
+
+The current rollout structure is:
+
+```text
+k8s/
+├── apps/        # bootstrap and reusable app manifests
+├── platform/    # shared services: monitoring, automation, dashboards
+├── staging/     # staging serving deployment
+├── canary/      # canary serving deployment + promote checks
+└── production/  # production serving deployment + HPA + rollback checks
+```
+
+## Working Rules
+
+1. Do not duplicate shared platform services per role or environment unless there is a real technical reason.
+2. Treat `apps/` as reusable building blocks or bootstrap manifests, not the final system boundary.
+3. Keep shared service names, buckets, secrets, and promotion logic consistent across environments.
+4. Keep NodePort and entrypoint pinning only where it is needed for Chameleon access and local-path storage behavior.

@@ -87,7 +87,9 @@ Script-specific:
 
 ```
 # data_generator.py
-SERVING_URL=http://substitution-serving.forkwise-serving.svc.cluster.local:8000/predict
+SERVING_URL=http://subst-serving.production-proj01.svc.cluster.local:8000/predict
+CANARY_SERVING_URL=http://subst-serving.canary-proj01.svc.cluster.local:8000/predict
+CANARY_TRAFFIC_PERCENT=0.10
 REQUESTS_PER_SEC=1
 
 # batch_pipeline.py
@@ -196,4 +198,3 @@ MIN_REQUESTS_EXPECTED=1 python drift_monitor.py
 # Test 5: Data generator — needs serving endpoint up
 SERVING_URL=http://localhost:8000/predict python data_generator.py
 ```
-

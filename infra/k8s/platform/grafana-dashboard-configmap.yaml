@@ -1,0 +1,127 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-forkwise
+  namespace: monitoring-proj01
+data:
+  forkwise-overview.json: |
+    {
+      "annotations": {"list": []},
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "panels": [
+        {
+          "datasource": {"type": "prometheus", "uid": "forkwise-prometheus"},
+          "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+          "id": 1,
+          "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}},
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum by (le) (rate(subst_request_latency_seconds_bucket{namespace=\"production-proj01\"}[10m])))",
+              "legendFormat": "production p95",
+              "refId": "A"
+            },
+            {
+              "expr": "histogram_quantile(0.95, sum by (le) (rate(subst_request_latency_seconds_bucket{namespace=\"canary-proj01\"}[10m])))",
+              "legendFormat": "canary p95",
+              "refId": "B"
+            }
+          ],
+          "title": "Serving P95 Latency",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "forkwise-prometheus"},
+          "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}, "overrides": []},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+          "id": 2,
+          "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}},
+          "targets": [
+            {
+              "expr": "sum(rate(subst_requests_total{namespace=\"production-proj01\",status=\"error\"}[5m])) / sum(rate(subst_requests_total{namespace=\"production-proj01\"}[5m]))",
+              "legendFormat": "production error rate",
+              "refId": "A"
+            },
+            {
+              "expr": "sum(rate(subst_requests_total{namespace=\"canary-proj01\",status=\"error\"}[5m])) / sum(rate(subst_requests_total{namespace=\"canary-proj01\"}[5m]))",
+              "legendFormat": "canary error rate",
+              "refId": "B"
+            }
+          ],
+          "title": "Serving Error Rate",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "forkwise-prometheus"},
+          "fieldConfig": {"defaults": {"mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}, "unit": "none"}, "overrides": []},
+          "gridPos": {"h": 8, "w": 6, "x": 0, "y": 8},
+          "id": 3,
+          "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+          "targets": [
+            {
+              "expr": "max(subst_model_loaded{namespace=\"production-proj01\"})",
+              "refId": "A"
+            }
+          ],
+          "title": "Production Model Loaded",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "forkwise-prometheus"},
+          "fieldConfig": {"defaults": {"unit": "short", "min": 0}, "overrides": []},
+          "gridPos": {"h": 8, "w": 6, "x": 6, "y": 8},
+          "id": 4,
+          "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+          "targets": [
+            {
+              "expr": "sum(rate(subst_feedback_errors_total{namespace=\"forkwise-data\"}[5m]))",
+              "refId": "A"
+            }
+          ],
+          "title": "Feedback Write Errors / sec",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "forkwise-prometheus"},
+          "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+          "id": 5,
+          "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}},
+          "targets": [
+            {
+              "expr": "sum(rate(subst_requests_total{namespace=\"production-proj01\"}[5m]))",
+              "legendFormat": "production req/s",
+              "refId": "A"
+            },
+            {
+              "expr": "sum(rate(subst_requests_total{namespace=\"canary-proj01\"}[5m]))",
+              "legendFormat": "canary req/s",
+              "refId": "B"
+            },
+            {
+              "expr": "sum(rate(subst_requests_total{namespace=\"staging-proj01\"}[5m]))",
+              "legendFormat": "staging req/s",
+              "refId": "C"
+            }
+          ],
+          "title": "Serving Traffic",
+          "type": "timeseries"
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 39,
+      "style": "dark",
+      "tags": ["forkwise"],
+      "templating": {"list": []},
+      "time": {"from": "now-6h", "to": "now"},
+      "timepicker": {},
+      "timezone": "",
+      "title": "ForkWise Overview",
+      "uid": "forkwise-overview",
+      "version": 1,
+      "weekStart": ""
+    }
