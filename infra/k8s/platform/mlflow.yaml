@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow
+  namespace: monitoring-proj01
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mlflow
+  template:
+    metadata:
+      labels:
+        app: mlflow
+    spec:
+      containers:
+        - name: mlflow
+          image: ghcr.io/mlflow/mlflow:v2.12.2
+          command:
+            - /bin/sh
+            - -c
+            - |
+              pip install boto3 -q &&
+              mlflow server
+                --host 0.0.0.0
+                --port 5000
+                --backend-store-uri sqlite:///mlflow/db/mlflow.db
+                --default-artifact-root s3://data-proj01/mlflow
+                --artifacts-destination s3://data-proj01/mlflow
+          ports:
+            - containerPort: 5000
+          env:
+            - name: MLFLOW_S3_ENDPOINT_URL
+              value: "https://chi.tacc.chameleoncloud.org:7480"
+            - name: AWS_ACCESS_KEY_ID
+              value: "8921c48faf83433db2b1439a9b2889fd"
+            - name: AWS_SECRET_ACCESS_KEY
+              value: "7d1ce78efc5a48019888c9f3fa8ba2dd"
+          volumeMounts:
+            - name: mlflow-db
+              mountPath: /mlflow/db
+      volumes:
+        - name: mlflow-db
+          persistentVolumeClaim:
+            claimName: mlflow-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mlflow-pvc
+  namespace: monitoring-proj01
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlflow
+  namespace: monitoring-proj01
+spec:
+  selector:
+    app: mlflow
+  ports:
+    - port: 5000
+      targetPort: 5000
+  type: ClusterIP
