@@ -1,66 +1,64 @@
-# ── Project network + subnet (with gateway for internet via router) ──
-resource "openstack_networking_network_v2" "project_net" {
-  name                  = "net-forkwise-${var.suffix}"
+# Private network for inter-node communication
+resource "openstack_networking_network_v2" "private_net" {
+  name                  = "private-net-${var.suffix}"
   port_security_enabled = false
 }
 
-resource "openstack_networking_subnet_v2" "project_subnet" {
-  name            = "subnet-forkwise-${var.suffix}"
-  network_id      = openstack_networking_network_v2.project_net.id
-  cidr            = "192.168.1.0/24"
-  ip_version      = 4
-  dns_nameservers = ["8.8.8.8", "8.8.4.4"]
+resource "openstack_networking_subnet_v2" "private_subnet" {
+  name       = "private-subnet-${var.suffix}"
+  network_id = openstack_networking_network_v2.private_net.id
+  cidr       = "192.168.1.0/24"
+  no_gateway = true
 }
 
-# ── Router: connects project subnet to the public network ──
-resource "openstack_networking_router_v2" "router" {
-  name                = "router-forkwise-${var.suffix}"
-  external_network_id = data.openstack_networking_network_v2.public_net.id
-}
-
-resource "openstack_networking_router_interface_v2" "router_iface" {
-  router_id = openstack_networking_router_v2.router.id
-  subnet_id = openstack_networking_subnet_v2.project_subnet.id
-}
-
-# ── Ports on the project network ──
-resource "openstack_networking_port_v2" "project_ports" {
+# Ports on private network
+resource "openstack_networking_port_v2" "private_net_ports" {
   for_each              = var.nodes
-  name                  = "port-${each.key}-forkwise-${var.suffix}"
-  network_id            = openstack_networking_network_v2.project_net.id
+  name                  = "port-${each.key}-${var.suffix}"
+  network_id            = openstack_networking_network_v2.private_net.id
   port_security_enabled = false
 
   fixed_ip {
-    subnet_id  = openstack_networking_subnet_v2.project_subnet.id
+    subnet_id  = openstack_networking_subnet_v2.private_subnet.id
     ip_address = each.value
   }
 }
 
-# ── Compute instances ──
+# Ports on sharednet1
+resource "openstack_networking_port_v2" "sharednet1_ports" {
+  for_each           = var.nodes
+  name               = "sharednet1-${each.key}-${var.suffix}"
+  network_id         = data.openstack_networking_network_v2.sharednet1.id
+  security_group_ids = [data.openstack_networking_secgroup_v2.default.id]
+}
+
+# Compute instances
 resource "openstack_compute_instance_v2" "nodes" {
-  for_each    = var.nodes
-  name        = "${each.key}-serving-${var.suffix}"
-  image_name  = var.image_name
-  flavor_id   = var.flavor_id != "" ? var.flavor_id : null
-  flavor_name = var.flavor_id == "" ? var.flavor_name : null
-  key_pair    = var.key
+  for_each = var.nodes
+
+  name       = "${each.key}-${var.suffix}"
+  image_name = "CC-Ubuntu24.04"
+  flavor_id  = var.reservation
+  key_pair   = var.key
 
   network {
-    port = openstack_networking_port_v2.project_ports[each.key].id
+    port = openstack_networking_port_v2.sharednet1_ports[each.key].id
+  }
+
+  network {
+    port = openstack_networking_port_v2.private_net_ports[each.key].id
   }
 
   user_data = <<-EOF
     #!/bin/bash
-    echo "127.0.1.1 ${each.key}-serving-${var.suffix}" >> /etc/hosts
+    sudo echo "127.0.1.1 ${each.key}-${var.suffix}" >> /etc/hosts
     su cc -c /usr/local/bin/cc-load-public-keys
   EOF
-
-  depends_on = [openstack_networking_router_interface_v2.router_iface]
 }
 
-# ── Floating IP on node1 ──
+# Floating IP on node1
 resource "openstack_networking_floatingip_v2" "floating_ip" {
-  pool        = var.floating_ip_pool
-  description = "ForkWise floating IP for ${var.suffix}"
-  port_id     = openstack_networking_port_v2.project_ports["node1"].id
+  pool        = "public"
+  description = "ForkWise IP for ${var.suffix}"
+  port_id     = openstack_networking_port_v2.sharednet1_ports["node1"].id
 }

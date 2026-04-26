@@ -1,3 +1,4 @@
 provider "openstack" {
-  cloud = var.openstack_cloud
+  cloud         = "openstack"
+  endpoint_type = "public"
 }

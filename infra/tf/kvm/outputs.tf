@@ -1,11 +1,9 @@
 output "floating_ip" {
-  value = openstack_networking_floatingip_v2.floating_ip.address
+  description = "Floating IP assigned to node1"
+  value       = openstack_networking_floatingip_v2.floating_ip.address
 }
 
-output "node_names" {
-  value = [for node in openstack_compute_instance_v2.nodes : node.name]
-}
-
-output "private_ips" {
-  value = var.nodes
+output "node_ips" {
+  description = "Private network IPs for all nodes"
+  value       = { for k, v in var.nodes : k => v }
 }
