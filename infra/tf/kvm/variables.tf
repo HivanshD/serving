@@ -32,22 +32,10 @@ variable "flavor_name" {
   default     = "m1.medium"
 }
 
-variable "sharednet_name" {
-  description = "Default external network used by the simple lab-style topology"
-  type        = string
-  default     = "sharednet1"
-}
-
 variable "floating_ip_pool" {
-  description = "Floating IP pool"
+  description = "Floating IP pool / external network name"
   type        = string
   default     = "public"
-}
-
-variable "security_group_names" {
-  description = "Security groups attached to the public/sharednet interface"
-  type        = list(string)
-  default     = ["default"]
 }
 
 variable "nodes" {
