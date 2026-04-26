@@ -1,88 +1,84 @@
-# ForkWise — Training
+---
 
-## Files
+## Quick Start
 
-| File | Purpose |
-|------|---------|
-| `train.py` | Main training script. Loads data, trains model, evaluates MRR@3, applies quality gate, saves checkpoint to MLflow + object storage |
-| `evaluate.py` | Computes MRR@3, NDCG@3, per-cuisine fairness metrics (safeguarding requirement) |
-| `model_stub.py` | `SubstitutionModel` class — shared with serving so checkpoint format matches |
-| `watch_trigger.py` | K8S CronJob (every 30 min). Polls `data-proj01/triggers/` for retraining triggers from data team |
-| `config.yaml` | Default hyperparameters. CLI args override these for sweep runs |
-| `generate_synthetic_data.py` | Creates synthetic train/val/test data for immediate hyperparameter tuning |
-| `requirements.txt` | Python dependencies |
-| `docker_nvidia/Dockerfile` | NVIDIA CUDA container (RTX 6000 on CHI@UC) |
-
-## Quick Start (on Chameleon CHI@UC node)
-
+### 1. Build Docker image
 ```bash
-# 1. Generate synthetic data
-python training/generate_synthetic_data.py
-
-# 2. Build Docker container
-docker build -t train:latest -f training/docker_nvidia/Dockerfile .
-
-# 3. Run training
-docker run --rm --gpus all \
-  -v $(pwd):/workspace \
-  --shm-size=12g --network host \
-  train:latest \
-  python training/train.py \
-    --config training/config.yaml \
-    --dataset /workspace/data/processed/train.json \
-    --embed_dim 128 \
-    --run_name gismo-emb128-gpu \
-    --mlflow_tracking_uri http://<HOST_IP>:5000
+docker build -t forkwise-train:latest .
 ```
 
-## Hyperparameter Sweep
-
-Override config values via CLI:
-
+### 2. Run training
 ```bash
-# Larger embeddings
---embed_dim 256 --run_name gismo-emb256
-
-# Lower learning rate for big models
---embed_dim 512 --lr 0.0005 --run_name gismo-emb512-lr5e4
-
-# More epochs
---epochs 50 --run_name gismo-50ep
-
-# Bigger batches (smoother gradients, better GPU util)
---batch_size 256 --run_name gismo-bs256
-
-# Higher contrastive margin
---margin 1.0 --run_name gismo-margin1.0
+docker run --rm --gpus all --network host \\
+  -e MLFLOW_TRACKING_URI=http://129.114.108.56:5000 \\
+  -e OS_ENDPOINT=https://chi.tacc.chameleoncloud.org:7480 \\
+  -e OS_ACCESS_KEY=your_key \\
+  -e OS_SECRET_KEY=your_secret \\
+  -e DATA_BUCKET=data-proj01 \\
+  forkwise-train:latest
 ```
 
-## Quality Gate
-
-- Threshold: MRR@3 >= 0.15
-- Random baseline: ~0.10
-- Models that pass: saved as versioned candidate artifacts in `models-proj01/versions/` and published as candidate manifests in `models-proj01/candidates/`
-- Models that fail: logged in MLflow with `quality_gate: failed` tag, not saved
-
-## Object Storage Paths
-
+### 3. Run inference
+```bash
+python3 training/inference_gismo.py
 ```
-READS:  data-proj01/raw/recipe1msubs/{train,val,test}.json
-READS:  data-proj01/triggers/retrain_*.json
-READS:  data-proj01/processed/train_v*.json
-WRITES: models-proj01/checkpoints/subst_model_v{run_id}.pth
-WRITES: models-proj01/versions/<model_version>/{subst_model.pth,subst_model.onnx,vocab.json}
-WRITES: models-proj01/candidates/<model_version>.json
-WRITES: models-proj01/candidates/latest.json
-WRITES: MLflow model registry
+
+### 4. Set up auto-retrain cron every 6 hours
+```bash
+chmod +x training/retrain_cron.sh
+(crontab -l 2>/dev/null; echo "0 */6 * * * /home/cc/retrain_cron.sh") | crontab -
 ```
-| Order | Run | embed_dim | lr | epochs | batch_size | margin | Time |
-|---|---|---|---|---|---|---|---|
-| 1 | baseline | 64 | 0.01 | 5 | 32 | 0.3 | ~1 min |
-| 2 | v1 | 128 | 0.01 | 20 | 128 | 0.3 | ~3 min |
-| 3 | v2 | 256 | 0.001 | 30 | 64 | 0.5 | ~7 min |
-| 4 | v3 | 512 | 0.0005 | 40 | 64 | 0.7 | ~12 min |
-| 5 | final | 4096 | 0.0001 | 50 | 32 | 1.0 | ~90 min |
-| 6 | final-v2 | 2048 | 0.0003 | 50 | 32 | 1.0 | ~45 min |
-| 7 | final-best | 4096 | 0.00003 | 50 | 8 | 2.0 | ~51 min |
-| 8 | final-best-v2 | 4096 | 0.00001 | 100 | 8 | 2.0 | ~2 hrs |
-| 9 | gismo-final | 4096 | 0.00001 | 100 | 8 | 2.0 | ~2 hrs |
+
+---
+
+## Inference Example
+
+```python
+predict_substitutes("butter", ["flour", "sugar", "eggs", "vanilla", "milk"], top_k=5)
+
+# Output:
+# 1. margarine   (score: 0.91)
+# 2. oil         (score: 0.87)
+# 3. applesauce  (score: 0.82)
+# 4. yogurt      (score: 0.79)
+# 5. coconut oil (score: 0.76)
+```
+
+---
+
+## MLflow Tracking
+
+All training runs tracked at: http://129.114.108.56:5000
+
+Metrics logged per run:
+- train_loss per epoch
+- hit_at_1, hit_at_3, hit_at_10 every 10 epochs
+- best_hit_at_10 best checkpoint metric
+- train_time_sec total training time
+
+---
+
+## Team
+
+| Role | Name |
+|------|------|
+| Training | Karuna Venkatesh (fk2496@nyu.edu) |
+
+Course: MLOps — NYU Tandon School of Engineering SP26
+Project: CHI-251409 (Chameleon Cloud)
+GitHub: https://github.com/HivanshD/ml-sys-ops-project
+"""
+
+with s.ssh_connection() as ssh:
+    sftp = ssh.sftp()
+    with sftp.open('/home/cc/ml-sys-ops-project/README.md', 'w') as f:
+        f.write(readme)
+    sftp.close()
+
+s.execute("""
+cd /home/cc/ml-sys-ops-project && \
+git add README.md && \
+git commit -m 'docs: update README with GISMo architecture, metrics, quick start' && \
+git push origin feature/gismo-training-v2
+""")
+print('README pushed ✓')
