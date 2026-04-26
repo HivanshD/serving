@@ -1,0 +1,43 @@
+experiment_name: forkwise-ingredient-substitution
+
+model:
+  name: GISMo-Attn-HardNeg
+  embed_dim: 512
+  num_layers: 2
+  dropout: 0.1
+
+training:
+  epochs: 100
+  lr: 0.001
+  batch_size: 256
+  margin: 0.2
+  weight_decay: 1.0e-5
+  optimizer: AdamW
+  scheduler: CosineAnnealingLR
+  eval_every: 10
+  eval_samples: 1000
+  context_len: 20
+  negatives: hard
+  eval_mode: multi_positive
+
+data:
+  bucket: data-proj01
+  train_key: data/raw/recipe1msubs/train.json
+  val_key: data/raw/recipe1msubs/val.json
+  fg_nodes_key: data/raw/flavorgraph/nodes_191120.csv
+  fg_edges_key: data/raw/flavorgraph/edges_191120.csv
+
+mlflow:
+  tracking_uri: http://129.114.108.56:5000
+  experiment: forkwise-ingredient-substitution
+
+s3:
+  endpoint_url: https://chi.tacc.chameleoncloud.org:7480
+  checkpoint_prefix: models/checkpoints/
+  mlflow_backup: mlflow-backup/mlflow.db
+
+cron:
+  retrain_every: 6h
+  retrain_script: /home/cc/retrain_cron.sh
+
+device: cuda

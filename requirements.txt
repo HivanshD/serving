@@ -1,0 +1,8 @@
+torch==2.4.0
+mlflow==3.11.1
+boto3==1.42.96
+pandas==2.3.3
+numpy==2.2.6
+pyyaml==6.0.2
+tqdm==4.67.3
+scikit-learn
